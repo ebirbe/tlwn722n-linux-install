@@ -4,7 +4,7 @@
 # "TP-LINK TL-WN722N" or any other that uses the Atheros "htc_9271"
 # firmware.
 #
-# Copyright (C) 2011 Erick Birbe <erickcion at gmail dot com>
+# Copyright (C) 2011 Erick Birbe <erickcion@gmail.com>
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
