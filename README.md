@@ -1,4 +1,5 @@
-# tlwn722n-linux-install=
+# tlwn722n-linux-install
+
 An automatic installer for Wireless USB device "TP-LINK TL-WN722N" or any other that uses the Atheros "htc_9271" firmware.
 
 Copyright (C) 2011 Erick Birbe <erickcion@gmail.com>
