@@ -23,7 +23,7 @@ with this program; if not, write to the Free Software Foundation, Inc.,
 
 The following applications are required before run the install script:
 
-* linux-headers-[version] (Where [version] is your specific kernel 
+* linux-headers-\[version\] (Where \[version\] is your specific kernel 
  version and architecture)
 * make
 * tar
