@@ -32,7 +32,7 @@ The following applications are required before run the install script:
 You can install the required applications with the next command as root
 (only in debian based systems):
 
- apt-get install make tar wget linux-header-$(uname -r)
+ '''apt-get install make tar wget linux-header-$(uname -r)'''
 
 If you have a debian based system and other active internet connection,
 the linux-headers-[version] will automatically be installed by the 
