@@ -62,7 +62,7 @@ if [ -f $PWD$CWPACKAGE$CWEXT ]; then
 else
 	if [ -x "`which wget`" ]; then
 		echo "Downloading package" $CWPACKAGE", please wait..."
-		wget -v -c $CWURL$CWPACKAGE$CWEXT -O $CWPACKAGE$CWEXT
+		wget -v $CWURL$CWPACKAGE$CWEXT -O $CWPACKAGE$CWEXT
 		if [ $? -ne 0 ]; then
 			echo "There was a problem downloading" $CWPACKAGE 1>&2
 			exit 1
