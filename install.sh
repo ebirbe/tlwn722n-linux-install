@@ -21,9 +21,6 @@
 # 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
 #
 
-CWPACKAGE="compat-wireless-2.6"
-CWEXT=".tar.bz2"
-CWURL="http://linuxwireless.org/download/compat-wireless-2.6/"
 MOD_NAME="ath9k_htc"
 FW_NAME="htc_9271.fw"
 CWDRVSLCT="./scripts/driver-select"
@@ -32,8 +29,7 @@ MOD_DIR="/lib/modules/"$(uname -r)
 PWD=$( pwd )/
 SRC="source"
 
-# TODO descargar firmware
-# TODO Comprobar y descargar linux-header
+CWSRC="compat-wireless-2012-05-10"
 
 # Make sure only root can run our script
 if [[ $EUID -ne 0 ]]; then
@@ -56,24 +52,7 @@ else
 	fi
 fi
 
-if [ -f $PWD$CWPACKAGE$CWEXT ]; then
-	# The file is present, Do not download and continue
-	echo ""
-else
-	if [ -x "`which wget`" ]; then
-		echo "Downloading package" $CWPACKAGE", please wait..."
-		wget -v $CWURL$CWPACKAGE$CWEXT -O $CWPACKAGE$CWEXT
-		if [ $? -ne 0 ]; then
-			echo "There was a problem downloading" $CWPACKAGE 1>&2
-			exit 1
-		fi
-	else
-		echo "wget is not installed." 1>&2
-		echo "Please, install wget to continue." 1>&2
-		exit 1
-	fi
-fi
-
+echo "Installing firware..."
 if [ -d $FW_DIR ]; then
 	if [ -f $FW_DIR$FW_NAME ]; then
 		echo ""
@@ -89,29 +68,6 @@ else
 	exit 1
 fi
 
-if [ -x "`which tar`" ]; then
-	echo "Decompressing the package, please wait..."
-	if [ -d $SRC ]; then
-		echo ""
-	else
-		mkdir $SRC
-	fi
-	if [ $? -ne 0 ]; then
-		echo "There was a problem creating the directory, check your permissions." 1>&2
-		exit 1
-	fi
-	tar jxvf $PWD$CWPACKAGE$CWEXT -C $SRC
-	if [ $? -ne 0 ]; then
-		echo "There was a problem decompressing" $CWPACKAGE$CWEXT 1>&2
-		exit 1
-	fi
-else
-	echo "tar is not installed."
-	echo "Please, install tar to continue."
-	exit
-fi
-
-CWSRC=$SRC/$(ls -1tr $SRC | tail -1)
 echo "Changing to directory \"$CWSRC\"..."
 cd $CWSRC
 
@@ -154,7 +110,7 @@ else
 	exit
 fi
 
-# Cargando el nuevo modulo del firmware
+echo "Loading module in kernel..."
 if [ -x "`which modprobe`" ]; then
 	echo "Loading new module..."
 	modprobe $MOD_NAME
@@ -169,10 +125,10 @@ else
 	exit
 fi
 
-echo "Restoring" $CWPACKAGE"..."
+echo "Restoring source code..."
 $CWDRVSLCT restore
 if [ $? -ne 0 ]; then
-	echo $CWPACKAGE "Could not be restored." 1>&2
+	echo "Source code could not be restored." 1>&2
 fi
 
 echo "Returning to directory" $PWD
