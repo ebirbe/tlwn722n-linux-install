@@ -1,0 +1,23 @@
+This section of the libertas driver calls functions that simply don't
+exist before the release of 3.1.  This code in question was an addition,
+not a change from any existing code.  It is safe to simply remove it for
+older kernels.
+
+--- a/drivers/net/wireless/libertas/if_usb.c
++++ b/drivers/net/wireless/libertas/if_usb.c
+@@ -962,6 +962,7 @@ static int if_usb_suspend(struct usb_int
+ 		goto out;
+ 	}
+ 
++#if (LINUX_VERSION_CODE >= KERNEL_VERSION(3,1,0))
+ #ifdef CONFIG_OLPC
+ 	if (machine_is_olpc()) {
+ 		if (priv->wol_criteria == EHS_REMOVE_WAKEUP)
+@@ -970,6 +971,7 @@ static int if_usb_suspend(struct usb_int
+ 			olpc_ec_wakeup_set(EC_SCI_SRC_WLAN);
+ 	}
+ #endif
++#endif
+ 
+ 	ret = lbs_suspend(priv);
+ 	if (ret)

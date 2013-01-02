@@ -1,0 +1,372 @@
+This reverts the commits that deal with hw_features and
+set_features, fix_features for kernels < 2.6.39.
+
+Below is one example commit being reverted, but we also do
+this for ath6kl and any driver that uses this in this file.
+
+commit 782d640afd15af7a1faf01cfe566ca4ac511319d
+Author: Michał Mirosław <mirq-linux@rere.qmqm.pl>
+Date:   Thu Apr 7 07:32:18 2011 +0000
+
+    net: atl*: convert to hw_features
+    
+    Things left as they were:
+     - atl1: is RX checksum really enabled?
+     - atl2: copy-paste from atl1, with-errors-on-modify I presume
+     - atl1c: there's a bug: MTU can't be changed if device is not up
+    
+    Signed-off-by: Michał Mirosław <mirq-linux@rere.qmqm.pl>
+    Signed-off-by: David S. Miller <davem@davemloft.net>
+
+--- a/drivers/net/ethernet/atheros/atl1c/atl1c_ethtool.c
++++ b/drivers/net/ethernet/atheros/atl1c/atl1c_ethtool.c
+@@ -114,6 +114,13 @@ static int atl1c_set_settings(struct net
+ 	return 0;
+ }
+ 
++#if (LINUX_VERSION_CODE < KERNEL_VERSION(2,6,39))
++static u32 atl1c_get_tx_csum(struct net_device *netdev)
++{
++	return (netdev->features & NETIF_F_HW_CSUM) != 0;
++}
++#endif /* (LINUX_VERSION_CODE < KERNEL_VERSION(2,6,39)) */
++
+ static u32 atl1c_get_msglevel(struct net_device *netdev)
+ {
+ 	struct atl1c_adapter *adapter = netdev_priv(netdev);
+@@ -301,6 +308,11 @@ static const struct ethtool_ops atl1c_et
+ 	.get_link               = ethtool_op_get_link,
+ 	.get_eeprom_len         = atl1c_get_eeprom_len,
+ 	.get_eeprom             = atl1c_get_eeprom,
++#if (LINUX_VERSION_CODE < KERNEL_VERSION(2,6,39))
++	.get_tx_csum            = atl1c_get_tx_csum,
++	.get_sg                 = ethtool_op_get_sg,
++	.set_sg                 = ethtool_op_set_sg,
++#endif /* (LINUX_VERSION_CODE < KERNEL_VERSION(2,6,39)) */
+ };
+ 
+ void atl1c_set_ethtool_ops(struct net_device *netdev)
+--- a/drivers/net/ethernet/atheros/atl1c/atl1c_main.c
++++ b/drivers/net/ethernet/atheros/atl1c/atl1c_main.c
+@@ -493,6 +493,7 @@ static void atl1c_set_rxbufsize(struct a
+ 		roundup(mtu + ETH_HLEN + ETH_FCS_LEN + VLAN_HLEN, 8) : AT_RX_BUF_SIZE;
+ }
+ 
++#if (LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,39))
+ static netdev_features_t atl1c_fix_features(struct net_device *netdev,
+ 	netdev_features_t features)
+ {
+@@ -521,6 +522,7 @@ static int atl1c_set_features(struct net
+ 
+ 	return 0;
+ }
++#endif /* (LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,39)) */
+ 
+ /*
+  * atl1c_change_mtu - Change the Maximum Transfer Unit
+@@ -553,8 +555,19 @@ static int atl1c_change_mtu(struct net_d
+ 		netdev->mtu = new_mtu;
+ 		adapter->hw.max_frame_size = new_mtu;
+ 		atl1c_set_rxbufsize(adapter, netdev);
++#if (LINUX_VERSION_CODE < KERNEL_VERSION(2,6,39))
++		if (new_mtu > MAX_TSO_FRAME_SIZE) {
++			adapter->netdev->features &= ~NETIF_F_TSO;
++			adapter->netdev->features &= ~NETIF_F_TSO6;
++		} else {
++			adapter->netdev->features |= NETIF_F_TSO;
++			adapter->netdev->features |= NETIF_F_TSO6;
++		}
++#endif /* (LINUX_VERSION_CODE < KERNEL_VERSION(2,6,39)) */
+ 		atl1c_down(adapter);
++#if (LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,39))
+ 		netdev_update_features(netdev);
++#endif /* (LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,39)) */
+ 		atl1c_up(adapter);
+ 		clear_bit(__AT_RESETTING, &adapter->flags);
+ 	}
+@@ -2407,8 +2420,10 @@ static const struct net_device_ops atl1c
+ 	.ndo_set_mac_address	= atl1c_set_mac_addr,
+ 	.ndo_set_rx_mode	= atl1c_set_multi,
+ 	.ndo_change_mtu		= atl1c_change_mtu,
++#if (LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,39))
+ 	.ndo_fix_features	= atl1c_fix_features,
+ 	.ndo_set_features	= atl1c_set_features,
++#endif /* (LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,39)) */
+ 	.ndo_do_ioctl		= atl1c_ioctl,
+ 	.ndo_tx_timeout		= atl1c_tx_timeout,
+ 	.ndo_get_stats		= atl1c_get_stats,
+@@ -2427,6 +2442,7 @@ static int atl1c_init_netdev(struct net_
+ 	atl1c_set_ethtool_ops(netdev);
+ 
+ 	/* TODO: add when ready */
++#if (LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,39))
+ 	netdev->hw_features =	NETIF_F_SG	   |
+ 				NETIF_F_HW_CSUM	   |
+ 				NETIF_F_HW_VLAN_RX |
+@@ -2434,6 +2450,14 @@ static int atl1c_init_netdev(struct net_
+ 				NETIF_F_TSO6;
+ 	netdev->features =	netdev->hw_features |
+ 				NETIF_F_HW_VLAN_TX;
++#else
++	netdev->features =	NETIF_F_SG	   |
++				NETIF_F_HW_CSUM	   |
++				NETIF_F_HW_VLAN_TX |
++				NETIF_F_HW_VLAN_RX |
++				NETIF_F_TSO	   |
++				NETIF_F_TSO6;
++#endif /* (LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,39)) */
+ 	return 0;
+ }
+ 
+--- a/drivers/net/ethernet/atheros/atl1e/atl1e_ethtool.c
++++ b/drivers/net/ethernet/atheros/atl1e/atl1e_ethtool.c
+@@ -384,6 +384,11 @@ static const struct ethtool_ops atl1e_et
+ 	.get_eeprom_len         = atl1e_get_eeprom_len,
+ 	.get_eeprom             = atl1e_get_eeprom,
+ 	.set_eeprom             = atl1e_set_eeprom,
++#if (LINUX_VERSION_CODE < KERNEL_VERSION(2,6,39))
++	.set_tx_csum            = ethtool_op_set_tx_hw_csum,
++	.set_sg                 = ethtool_op_set_sg,
++	.set_tso                = ethtool_op_set_tso,
++#endif /* (LINUX_VERSION_CODE < KERNEL_VERSION(2,6,39)) */
+ };
+ 
+ void atl1e_set_ethtool_ops(struct net_device *netdev)
+--- a/drivers/net/ethernet/atheros/atl1e/atl1e_main.c
++++ b/drivers/net/ethernet/atheros/atl1e/atl1e_main.c
+@@ -375,6 +375,7 @@ static int atl1e_set_mac_addr(struct net
+ 	return 0;
+ }
+ 
++#if (LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,39))
+ static netdev_features_t atl1e_fix_features(struct net_device *netdev,
+ 	netdev_features_t features)
+ {
+@@ -400,6 +401,7 @@ static int atl1e_set_features(struct net
+ 
+ 	return 0;
+ }
++#endif /* (LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,39)) */
+ 
+ /*
+  * atl1e_change_mtu - Change the Maximum Transfer Unit
+@@ -1948,7 +1950,11 @@ void atl1e_down(struct atl1e_adapter *ad
+ 	 * reschedule our watchdog timer */
+ 	set_bit(__AT_DOWN, &adapter->flags);
+ 
++#if defined(NETIF_F_LLTX) || (LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,39))
+ 	netif_stop_queue(netdev);
++#else
++	netif_tx_disable(netdev);
++#endif
+ 
+ 	/* reset MAC to disable all RX/TX */
+ 	atl1e_reset_hw(&adapter->hw);
+@@ -2218,8 +2224,10 @@ static const struct net_device_ops atl1e
+ 	.ndo_set_rx_mode	= atl1e_set_multi,
+ 	.ndo_validate_addr	= eth_validate_addr,
+ 	.ndo_set_mac_address	= atl1e_set_mac_addr,
++#if (LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,39))
+ 	.ndo_fix_features	= atl1e_fix_features,
+ 	.ndo_set_features	= atl1e_set_features,
++#endif /* (LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,39)) */
+ 	.ndo_change_mtu		= atl1e_change_mtu,
+ 	.ndo_do_ioctl		= atl1e_ioctl,
+ 	.ndo_tx_timeout		= atl1e_tx_timeout,
+@@ -2239,10 +2247,15 @@ static int atl1e_init_netdev(struct net_
+ 	netdev->watchdog_timeo = AT_TX_WATCHDOG;
+ 	atl1e_set_ethtool_ops(netdev);
+ 
++#if (LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,39))
+ 	netdev->hw_features = NETIF_F_SG | NETIF_F_HW_CSUM | NETIF_F_TSO |
+ 			      NETIF_F_HW_VLAN_RX;
+ 	netdev->features = netdev->hw_features | NETIF_F_LLTX |
+ 			   NETIF_F_HW_VLAN_TX;
++#else
++	netdev->features = NETIF_F_SG | NETIF_F_HW_CSUM | NETIF_F_TSO |
++			   NETIF_F_HW_VLAN_RX | NETIF_F_LLTX | NETIF_F_HW_VLAN_TX;
++#endif /* (LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,39)) */
+ 
+ 	return 0;
+ }
+--- a/drivers/net/ethernet/atheros/atlx/atl1.c
++++ b/drivers/net/ethernet/atheros/atlx/atl1.c
+@@ -2924,8 +2924,10 @@ static const struct net_device_ops atl1_
+ 	.ndo_validate_addr	= eth_validate_addr,
+ 	.ndo_set_mac_address	= atl1_set_mac,
+ 	.ndo_change_mtu		= atl1_change_mtu,
++#if (LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,39))
+ 	.ndo_fix_features	= atlx_fix_features,
+ 	.ndo_set_features	= atlx_set_features,
++#endif /* (LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,39)) */
+ 	.ndo_do_ioctl		= atlx_ioctl,
+ 	.ndo_tx_timeout		= atlx_tx_timeout,
+ #ifdef CONFIG_NET_POLL_CONTROLLER
+@@ -3036,11 +3038,13 @@ static int __devinit atl1_probe(struct p
+ 	netdev->features |= NETIF_F_SG;
+ 	netdev->features |= (NETIF_F_HW_VLAN_TX | NETIF_F_HW_VLAN_RX);
+ 
++#if (LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,39))
+ 	netdev->hw_features = NETIF_F_HW_CSUM | NETIF_F_SG | NETIF_F_TSO |
+ 			      NETIF_F_HW_VLAN_RX;
+ 
+ 	/* is this valid? see atl1_setup_mac_ctrl() */
+ 	netdev->features |= NETIF_F_RXCSUM;
++#endif /* (LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,39)) */
+ 
+ 	/*
+ 	 * patch for some L1 of old version,
+@@ -3653,6 +3657,14 @@ static int atl1_set_pauseparam(struct ne
+ 	return 0;
+ }
+ 
++#if (LINUX_VERSION_CODE < KERNEL_VERSION(2,6,39))
++/* FIXME: is this right? -- CHS */
++static u32 atl1_get_rx_csum(struct net_device *netdev)
++{
++	return 1;
++}
++#endif /* (LINUX_VERSION_CODE < KERNEL_VERSION(2,6,39)) */
++
+ static void atl1_get_strings(struct net_device *netdev, u32 stringset,
+ 	u8 *data)
+ {
+@@ -3725,4 +3737,10 @@ static const struct ethtool_ops atl1_eth
+ 	.nway_reset		= atl1_nway_reset,
+ 	.get_ethtool_stats	= atl1_get_ethtool_stats,
+ 	.get_sset_count		= atl1_get_sset_count,
++#if (LINUX_VERSION_CODE < KERNEL_VERSION(2,6,39))
++	.get_rx_csum		= atl1_get_rx_csum,
++	.set_tx_csum		= ethtool_op_set_tx_hw_csum,
++	.set_sg			= ethtool_op_set_sg,
++	.set_tso		= ethtool_op_set_tso,
++#endif /* (LINUX_VERSION_CODE < KERNEL_VERSION(2,6,39)) */
+ };
+--- a/drivers/net/ethernet/atheros/atlx/atl2.c
++++ b/drivers/net/ethernet/atheros/atlx/atl2.c
+@@ -396,6 +396,7 @@ static void atl2_restore_vlan(struct atl
+ 	atl2_vlan_mode(adapter->netdev, adapter->netdev->features);
+ }
+ 
++#if (LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,39))
+ static netdev_features_t atl2_fix_features(struct net_device *netdev,
+ 	netdev_features_t features)
+ {
+@@ -421,6 +422,7 @@ static int atl2_set_features(struct net_
+ 
+ 	return 0;
+ }
++#endif /* (LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,39)) */
+ 
+ static void atl2_intr_rx(struct atl2_adapter *adapter)
+ {
+@@ -1336,8 +1338,10 @@ static const struct net_device_ops atl2_
+ 	.ndo_validate_addr	= eth_validate_addr,
+ 	.ndo_set_mac_address	= atl2_set_mac,
+ 	.ndo_change_mtu		= atl2_change_mtu,
++#if (LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,39))
+ 	.ndo_fix_features	= atl2_fix_features,
+ 	.ndo_set_features	= atl2_set_features,
++#endif /* (LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,39)) */
+ 	.ndo_do_ioctl		= atl2_ioctl,
+ 	.ndo_tx_timeout		= atl2_tx_timeout,
+ #ifdef CONFIG_NET_POLL_CONTROLLER
+@@ -1435,8 +1439,12 @@ static int __devinit atl2_probe(struct p
+ 
+ 	err = -EIO;
+ 
++#if (LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,39))
+ 	netdev->hw_features = NETIF_F_SG | NETIF_F_HW_VLAN_RX;
++#endif
++#if defined(NETIF_F_HW_VLAN_TX) || (LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,39))
+ 	netdev->features |= (NETIF_F_HW_VLAN_TX | NETIF_F_HW_VLAN_RX);
++#endif
+ 
+ 	/* Init PHY as early as possible due to power saving issue  */
+ 	atl2_phy_init(&adapter->hw);
+@@ -1863,6 +1871,13 @@ static int atl2_set_settings(struct net_
+ 	return 0;
+ }
+ 
++#if (LINUX_VERSION_CODE < KERNEL_VERSION(2,6,39))
++static u32 atl2_get_tx_csum(struct net_device *netdev)
++{
++	return (netdev->features & NETIF_F_HW_CSUM) != 0;
++}
++#endif /* (LINUX_VERSION_CODE < KERNEL_VERSION(2,6,39)) */
++
+ static u32 atl2_get_msglevel(struct net_device *netdev)
+ {
+ 	return 0;
+@@ -2132,6 +2147,14 @@ static const struct ethtool_ops atl2_eth
+ 	.get_eeprom_len		= atl2_get_eeprom_len,
+ 	.get_eeprom		= atl2_get_eeprom,
+ 	.set_eeprom		= atl2_set_eeprom,
++#if (LINUX_VERSION_CODE < KERNEL_VERSION(2,6,39))
++	.get_tx_csum		= atl2_get_tx_csum,
++	.get_sg			= ethtool_op_get_sg,
++	.set_sg			= ethtool_op_set_sg,
++#ifdef NETIF_F_TSO
++	.get_tso		= ethtool_op_get_tso,
++#endif
++#endif /* (LINUX_VERSION_CODE < KERNEL_VERSION(2,6,39)) */
+ };
+ 
+ static void atl2_set_ethtool_ops(struct net_device *netdev)
+--- a/drivers/net/ethernet/atheros/atlx/atlx.c
++++ b/drivers/net/ethernet/atheros/atlx/atlx.c
+@@ -255,6 +255,7 @@ static void atlx_restore_vlan(struct atl
+ 	atlx_vlan_mode(adapter->netdev, adapter->netdev->features);
+ }
+ 
++#if (LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,39))
+ static netdev_features_t atlx_fix_features(struct net_device *netdev,
+ 	netdev_features_t features)
+ {
+@@ -280,5 +281,6 @@ static int atlx_set_features(struct net_
+ 
+ 	return 0;
+ }
++#endif /* (LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,39)) */
+ 
+ #endif /* ATLX_C */
+--- a/drivers/net/wireless/ath/ath6kl/main.c
++++ b/drivers/net/wireless/ath/ath6kl/main.c
+@@ -1054,6 +1054,7 @@ static struct net_device_stats *ath6kl_g
+ 	return &vif->net_stats;
+ }
+ 
++#if (LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,39))
+ static int ath6kl_set_features(struct net_device *dev,
+ 			       netdev_features_t features)
+ {
+@@ -1086,6 +1087,7 @@ static int ath6kl_set_features(struct ne
+ 
+ 	return err;
+ }
++#endif
+ 
+ static void ath6kl_set_multicast_list(struct net_device *ndev)
+ {
+@@ -1213,7 +1215,9 @@ static const struct net_device_ops ath6k
+ 	.ndo_stop               = ath6kl_close,
+ 	.ndo_start_xmit         = ath6kl_data_tx,
+ 	.ndo_get_stats          = ath6kl_get_stats,
++#if (LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,39))
+ 	.ndo_set_features       = ath6kl_set_features,
++#endif
+ 	.ndo_set_rx_mode	= ath6kl_set_multicast_list,
+ };
+ 
+@@ -1228,7 +1232,11 @@ void init_netdev(struct net_device *dev)
+ 				sizeof(struct wmi_data_hdr) + HTC_HDR_LENGTH
+ 				+ WMI_MAX_TX_META_SZ + ATH6KL_HTC_ALIGN_BYTES;
+ 
++#if (LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,39))
+ 	dev->hw_features |= NETIF_F_IP_CSUM | NETIF_F_RXCSUM;
++#else
++	dev->features |= NETIF_F_IP_CSUM;
++#endif
+ 
+ 	return;
+ }

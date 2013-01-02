@@ -1,0 +1,16 @@
+Backport commit 99b88a0ecbdbc6df03527292571b2b442965814a
+The rest is backported in include/linux/compat-2.6.37.h
+
+--- a/net/mac80211/main.c
++++ b/net/mac80211/main.c
+@@ -1107,6 +1107,10 @@ static void __exit ieee80211_exit(void)
+ 	rc80211_minstrel_ht_exit();
+ 	rc80211_minstrel_exit();
+ 
++#if (LINUX_VERSION_CODE < KERNEL_VERSION(2,6,37))
++	flush_scheduled_work();
++#endif
++
+ 	if (mesh_allocated)
+ 		ieee80211s_stop();
+ 

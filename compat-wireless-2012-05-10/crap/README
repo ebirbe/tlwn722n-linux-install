@@ -1,0 +1,17 @@
+
+compat-wireless crap patches
+============================
+
+If you are including patches into this directory you
+must be fixing some critical bug for a customer which needs
+immediate release or immediate testing.
+
+Alternatively you would use this to apply some sort of
+crap code you are maintaining.
+
+You must have a really good reason to be adding files
+in this directory. If possible you should explain your
+reasoning of why the patch is getting included here and
+not upstream and why it hasn't even yet been posted.
+
+You should avoid these patches at all costs.

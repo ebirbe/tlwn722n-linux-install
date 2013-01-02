@@ -1,0 +1,32 @@
+
+tty->dev does not exist until 2.6.37. Typically
+subsystems will assign the tty device to a child
+to make a symlink under /sys/class/foobar. An example
+is the bluetooth subsystem.
+
+commit 7f4b2b04c88377af30c022f36c060190182850fb
+Author: Andrei Warkentin <andreiw@motorola.com>
+Date:   Fri Feb 11 17:19:26 2011 -0600
+
+    Bluetooth: Make hci a child of the corresponding tty device.
+    
+    Make /sys/class/bluetooth/hciX a symlink to
+    path under corresponding tty.
+    
+    Signed-off-by: Andrei Warkentin <andreiw@motorola.com>
+    Signed-off-by: Gustavo F. Padovan <padovan@profusion.mobi>
+
+
+--- a/drivers/bluetooth/hci_ldisc.c
++++ b/drivers/bluetooth/hci_ldisc.c
+@@ -393,7 +393,10 @@ static int hci_uart_register_dev(struct
+ 	hdev->close = hci_uart_close;
+ 	hdev->flush = hci_uart_flush;
+ 	hdev->send  = hci_uart_send_frame;
++
++#if (LINUX_VERSION_CODE > KERNEL_VERSION(2,6,36))
+ 	SET_HCIDEV_DEV(hdev, hu->tty->dev);
++#endif
+ 
+ 	if (test_bit(HCI_UART_RAW_DEVICE, &hu->hdev_flags))
+ 		set_bit(HCI_QUIRK_RAW_DEVICE, &hdev->quirks);

@@ -1,0 +1,71 @@
+When some other headers are included in some makefile it must be 
+relative to the current object file processed. When giving the full 
+path the make process will search in the kernel tree for the headers.
+
+--- a/drivers/net/wireless/rtl818x/rtl8180/Makefile
++++ b/drivers/net/wireless/rtl818x/rtl8180/Makefile
+@@ -2,4 +2,4 @@ rtl8180-objs		:= dev.o rtl8225.o sa2400.
+ 
+ obj-$(CONFIG_RTL8180)	+= rtl8180.o
+ 
+-ccflags-y += -Idrivers/net/wireless/rtl818x
++ccflags-y += -I$(obj)/..
+--- a/drivers/net/wireless/rtl818x/rtl8187/Makefile
++++ b/drivers/net/wireless/rtl818x/rtl8187/Makefile
+@@ -2,4 +2,4 @@ rtl8187-objs		:= dev.o rtl8225.o leds.o
+ 
+ obj-$(CONFIG_RTL8187)	+= rtl8187.o
+ 
+-ccflags-y += -Idrivers/net/wireless/rtl818x
++ccflags-y += -I$(obj)/..
+--- a/drivers/net/wireless/brcm80211/brcmfmac/Makefile
++++ b/drivers/net/wireless/brcm80211/brcmfmac/Makefile
+@@ -16,8 +16,8 @@
+ # CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
+ 
+ ccflags-y += \
+-	-Idrivers/net/wireless/brcm80211/brcmfmac	\
+-	-Idrivers/net/wireless/brcm80211/include
++	-I$(obj)		\
++	-I$(obj)/../include
+ 
+ ccflags-y += -D__CHECK_ENDIAN__
+ 
+--- a/drivers/net/wireless/brcm80211/brcmsmac/Makefile
++++ b/drivers/net/wireless/brcm80211/brcmsmac/Makefile
+@@ -17,9 +17,9 @@
+ 
+ ccflags-y := \
+ 	-D__CHECK_ENDIAN__ \
+-	-Idrivers/net/wireless/brcm80211/brcmsmac \
+-	-Idrivers/net/wireless/brcm80211/brcmsmac/phy \
+-	-Idrivers/net/wireless/brcm80211/include
++	-I$(obj)				\
++	-I$(obj)/phy				\
++	-I$(obj)/../include
+ 
+ BRCMSMAC_OFILES := \
+ 	mac80211_if.o \
+--- a/drivers/net/wireless/brcm80211/brcmutil/Makefile
++++ b/drivers/net/wireless/brcm80211/brcmutil/Makefile
+@@ -16,8 +16,8 @@
+ # CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
+ 
+ ccflags-y :=				\
+-	-Idrivers/net/wireless/brcm80211/brcmutil \
+-	-Idrivers/net/wireless/brcm80211/include
++	-I$(obj)			\
++	-I$(obj)/../include
+ 
+ BRCMUTIL_OFILES := \
+ 	utils.o
+--- a/net/wireless/Makefile
++++ b/net/wireless/Makefile
+@@ -18,6 +18,6 @@ cfg80211-$(CONFIG_CFG80211_INTERNAL_REGD
+ ccflags-y += -D__CHECK_ENDIAN__
+ 
+ $(obj)/regdb.c: $(src)/db.txt $(src)/genregdb.awk
+-	@$(AWK) -f $(srctree)/$(src)/genregdb.awk < $< > $@
++	@$(AWK) -f $(src)/genregdb.awk < $< > $@
+ 
+ clean-files := regdb.c

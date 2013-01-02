@@ -1,0 +1,23 @@
+--- a/drivers/net/wireless/ti/wl12xx/main.c
++++ b/drivers/net/wireless/ti/wl12xx/main.c
+@@ -1350,16 +1350,20 @@ static int __devinit wl12xx_probe(struct
+ 	return wlcore_probe(wl, pdev);
+ }
+ 
++#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,30)
+ static const struct platform_device_id wl12xx_id_table[] __devinitconst = {
+ 	{ "wl12xx", 0 },
+ 	{  } /* Terminating Entry */
+ };
+ MODULE_DEVICE_TABLE(platform, wl12xx_id_table);
++#endif
+ 
+ static struct platform_driver wl12xx_driver = {
+ 	.probe		= wl12xx_probe,
+ 	.remove		= __devexit_p(wlcore_remove),
++#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,30)
+ 	.id_table	= wl12xx_id_table,
++#endif
+ 	.driver = {
+ 		.name	= "wl12xx_driver",
+ 		.owner	= THIS_MODULE,

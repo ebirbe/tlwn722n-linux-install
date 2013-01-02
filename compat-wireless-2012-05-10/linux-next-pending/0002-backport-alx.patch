@@ -1,0 +1,133 @@
+This should go into patches/01-netdev.patch
+
+--- a/drivers/net/ethernet/atheros/alx/alx_main.c
++++ b/drivers/net/ethernet/atheros/alx/alx_main.c
+@@ -318,7 +318,11 @@ static void alx_set_multicase_list(struc
+ 
+ 	/* comoute mc addresses' hash value ,and put it into hash table */
+ 	netdev_for_each_mc_addr(ha, netdev)
++#if (LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,35))
+ 		hw->cbs.set_mc_addr(hw, ha->addr);
++#else
++		hw->cbs.set_mc_addr(hw, ha->dmi_addr);
++#endif
+ }
+ 
+ 
+@@ -337,8 +341,10 @@ static int alx_set_mac_address(struct ne
+ 	if (netif_running(netdev))
+ 		return -EBUSY;
+ 
++#if (LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,36))
+ 	if (netdev->addr_assign_type & NET_ADDR_RANDOM)
+ 		netdev->addr_assign_type ^= NET_ADDR_RANDOM;
++#endif
+ 
+ 	memcpy(netdev->dev_addr, addr->sa_data, netdev->addr_len);
+ 	memcpy(hw->mac_addr, addr->sa_data, netdev->addr_len);
+@@ -2483,7 +2489,7 @@ static void alx_free_all_rtx_descriptor(
+ 	ring_header->size = ring_header->used = 0;
+ }
+ 
+-
++#if (LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,39))
+ static netdev_features_t alx_fix_features(struct net_device *netdev,
+ 					  netdev_features_t features)
+ {
+@@ -2515,6 +2521,8 @@ static int alx_set_features(struct net_d
+ 		alx_vlan_mode(netdev, features);
+ 	return 0;
+ }
++#endif /* (LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,39)) */
++
+ /*
+  * alx_change_mtu - Change the Maximum Transfer Unit
+  */
+@@ -2538,7 +2546,17 @@ static int alx_change_mtu(struct net_dev
+ 		adpt->hw.mtu = new_mtu;
+ 		adpt->rxbuf_size = new_mtu > ALX_DEF_RX_BUF_SIZE ?
+ 				   ALIGN(max_frame, 8) : ALX_DEF_RX_BUF_SIZE;
++#if (LINUX_VERSION_CODE < KERNEL_VERSION(2,6,39))
++		if (new_mtu > (7*1024)) {
++			netdev->features &= ~NETIF_F_TSO;
++			netdev->features &= ~NETIF_F_TSO6;
++		} else {
++			netdev->features |= NETIF_F_TSO;
++			netdev->features |= NETIF_F_TSO6;
++		}
++#else
+ 		netdev_update_features(netdev);
++#endif /* (LINUX_VERSION_CODE < KERNEL_VERSION(2,6,39)) */
+ 		alx_reinit_locked(adpt);
+ 	}
+ 
+@@ -3444,8 +3462,10 @@ static const struct net_device_ops alx_n
+ 	.ndo_change_mtu         = alx_change_mtu,
+ 	.ndo_do_ioctl           = alx_ioctl,
+ 	.ndo_tx_timeout         = alx_tx_timeout,
++#if (LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,39))
+ 	.ndo_fix_features	= alx_fix_features,
+ 	.ndo_set_features	= alx_set_features,
++#endif /* (LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,39)) */
+ #ifdef CONFIG_NET_POLL_CONTROLLER
+ 	.ndo_poll_controller    = alx_poll_controller,
+ #endif
+@@ -3532,7 +3552,7 @@ static int __devinit alx_init(struct pci
+ 	netdev->base_addr = (unsigned long)adpt->hw.hw_addr;
+ 
+ 	/* set cb member of netdev structure*/
+-	netdev->netdev_ops = &alx_netdev_ops;
++	netdev_attach_ops(netdev, &alx_netdev_ops);
+ 	alx_set_ethtool_ops(netdev);
+ 	netdev->watchdog_timeo = ALX_WATCHDOG_TIME;
+ 	strncpy(netdev->name, pci_name(pdev), sizeof(netdev->name) - 1);
+@@ -3580,6 +3600,7 @@ static int __devinit alx_init(struct pci
+ 	adpt->max_rxques = min_t(int, ALX_MAX_RX_QUEUES, num_online_cpus());
+ 	adpt->max_txques = min_t(int, ALX_MAX_TX_QUEUES, num_online_cpus());
+ 
++#if (LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,39))
+ 	netdev->hw_features = NETIF_F_SG	 |
+ 			      NETIF_F_HW_CSUM	 |
+ 			      NETIF_F_HW_VLAN_RX;
+@@ -3591,6 +3612,19 @@ static int __devinit alx_init(struct pci
+ 	}
+ 	netdev->features = netdev->hw_features |
+ 			   NETIF_F_HW_VLAN_TX;
++#else
++	netdev->features = NETIF_F_SG	 |
++			   NETIF_F_HW_CSUM	 |
++			   NETIF_F_HW_VLAN_RX;
++	if (adpt->hw.mac_type != alx_mac_l1c &&
++	    adpt->hw.mac_type != alx_mac_l2c) {
++		netdev->features = netdev->features |
++				   NETIF_F_TSO |
++				   NETIF_F_TSO6;
++	}
++	netdev->features = netdev->features |
++			   NETIF_F_HW_VLAN_TX;
++#endif /* (LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,39)) */
+ 
+ 	/* get mac addr and perm mac addr, set to register */
+ 	if (hw->cbs.get_mac_addr)
+@@ -3862,6 +3896,8 @@ static struct pci_error_handlers alx_err
+ #ifdef CONFIG_PM_SLEEP
+ static SIMPLE_DEV_PM_OPS(alx_pm_ops, alx_suspend, alx_resume);
+ #define ALX_PM_OPS      (&alx_pm_ops)
++compat_pci_suspend(alx_suspend)
++compat_pci_resume(alx_resume)
+ #else
+ #define ALX_PM_OPS      NULL
+ #endif
+@@ -3874,7 +3910,12 @@ static struct pci_driver alx_driver = {
+ 	.remove      = __devexit_p(alx_remove),
+ 	.shutdown    = alx_shutdown,
+ 	.err_handler = &alx_err_handler,
++#if (LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,29))
+ 	.driver.pm   = ALX_PM_OPS,
++#elif defined(CONFIG_PM_SLEEP)
++	.suspend        = alx_suspend_compat,
++	.resume         = alx_resume_compat,
++#endif
+ };
+ 
+ 

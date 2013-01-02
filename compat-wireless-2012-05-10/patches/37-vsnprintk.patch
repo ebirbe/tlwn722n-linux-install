@@ -1,0 +1,35 @@
+--- a/drivers/net/wireless/ath/main.c
++++ b/drivers/net/wireless/ath/main.c
+@@ -59,6 +59,7 @@ struct sk_buff *ath_rxbuf_alloc(struct a
+ }
+ EXPORT_SYMBOL(ath_rxbuf_alloc);
+ 
++#if (LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,36))
+ void ath_printk(const char *level, const struct ath_common* common,
+ 		const char *fmt, ...)
+ {
+@@ -78,4 +79,24 @@ void ath_printk(const char *level, const
+ 
+ 	va_end(args);
+ }
++#else
++void ath_printk(const char *level, const struct ath_common* common,
++		const char *fmt, ...)
++{
++	va_list args;
++
++	va_start(args, fmt);
++
++	if (common && common->hw && common->hw->wiphy)
++		printk("%sath: %s: ",
++		       level, wiphy_name(common->hw->wiphy));
++	else
++		printk("%sath: ", level);
++
++	vprintk(fmt, args);
++
++	va_end(args);
++}
++#endif
++
+ EXPORT_SYMBOL(ath_printk);

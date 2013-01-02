@@ -1,0 +1,66 @@
+rfkill was re-implemented on 2.6.31. We port it to
+older kernels with a simple hack, just rename the
+module as a new one rfkill_backport, and every
+exported symbol gets redefined with a _backport
+postfix through compat-2.6.31.h. The changes below
+are the ones we could not do through compat-2.6.31.h
+
+Do older kernels have /dev/rfkill ? I not then we can
+just keep /dev/rfkill and not /dev/rfkill_backport.
+
+Note that 2.6.31 added netdevice notifier upon interface
+dev_open() which on cfg80211 will check if checks to see
+if rfkill is enabled (or if the mode of operation is not
+supported) on the  cfg80211_netdev_notifier_call() and if
+so deny bringing the interface up. This was added via
+commit:
+
+3b8bcfd5d31ea0fec58681d035544ace707d2536
+
+Since older kernels will not have the notifier call
+on dev_open() if we *really want* to port this we could have
+mac80211's subif_open() call :
+
+	ret = call_netdevice_notifiers(NETDEV_PRE_UP, dev);
+	ret = notifier_to_errno(ret);
+	if (ret)
+		return ret;
+
+This would do the policing from within mac80211.
+
+--- a/net/rfkill/Makefile
++++ b/net/rfkill/Makefile
+@@ -2,8 +2,8 @@
+ # Makefile for the RF switch subsystem.
+ #
+ 
+-rfkill-y			+= core.o
+-rfkill-$(CONFIG_RFKILL_INPUT)	+= input.o
+-obj-$(CONFIG_RFKILL)		+= rfkill.o
++rfkill_backport-y			+= core.o
++rfkill_backport-$(CONFIG_RFKILL_BACKPORT_INPUT)	+= input.o
++obj-$(CONFIG_RFKILL_BACKPORT)		+= rfkill_backport.o
+ obj-$(CONFIG_RFKILL_REGULATOR)	+= rfkill-regulator.o
+ obj-$(CONFIG_RFKILL_GPIO)	+= rfkill-gpio.o
+--- a/net/rfkill/input.c
++++ b/net/rfkill/input.c
+@@ -233,7 +233,7 @@ static int rfkill_connect(struct input_h
+ 
+ 	handle->dev = dev;
+ 	handle->handler = handler;
+-	handle->name = "rfkill";
++	handle->name = "rfkill_backport";
+ 
+ 	/* causes rfkill_start() to be called */
+ 	error = input_register_handle(handle);
+--- a/net/rfkill/core.c
++++ b/net/rfkill/core.c
+@@ -806,7 +806,7 @@ static int rfkill_resume(struct device *
+ }
+ 
+ static struct class rfkill_class = {
+-	.name		= "rfkill",
++	.name		= "rfkill_backport",
+ 	.dev_release	= rfkill_release,
+ 	.dev_attrs	= rfkill_dev_attrs,
+ 	.dev_uevent	= rfkill_dev_uevent,

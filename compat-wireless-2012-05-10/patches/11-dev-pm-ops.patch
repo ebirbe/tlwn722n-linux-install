@@ -1,0 +1,403 @@
+The 2.6.29 kernel has new struct dev_pm_ops [1] which are used
+on the pci device to distinguish power management hooks for suspend
+to RAM and hibernation. Older kernels don't have these so we need
+to resort back to the good ol' suspend/resume. Fortunately the calls
+are not so different so it should be possible to resuse the same
+calls on compat code with only slight modifications.
+
+[1] http://lxr.linux.no/#linux+v2.6.29/include/linux/pm.h#L170
+
+--- a/drivers/bcma/host_pci.c
++++ b/drivers/bcma/host_pci.c
+@@ -255,6 +255,10 @@ static int bcma_host_pci_resume(struct d
+ 
+ static SIMPLE_DEV_PM_OPS(bcma_pm_ops, bcma_host_pci_suspend,
+ 			 bcma_host_pci_resume);
++
++compat_pci_suspend(bcma_host_pci_suspend)
++compat_pci_resume(bcma_host_pci_resume)
++
+ #define BCMA_PM_OPS	(&bcma_pm_ops)
+ 
+ #else /* CONFIG_PM */
+@@ -278,7 +282,12 @@ static struct pci_driver bcma_pci_bridge
+ 	.id_table = bcma_pci_bridge_tbl,
+ 	.probe = bcma_host_pci_probe,
+ 	.remove = bcma_host_pci_remove,
++#if (LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,29))
+ 	.driver.pm = BCMA_PM_OPS,
++#elif defined(CONFIG_PM)
++	.suspend = bcma_host_pci_suspend_compat,
++	.resume = bcma_host_pci_resume_compat,
++#endif
+ };
+ 
+ int __init bcma_host_pci_init(void)
+--- a/drivers/net/ethernet/atheros/atl1c/atl1c_main.c
++++ b/drivers/net/ethernet/atheros/atl1c/atl1c_main.c
+@@ -2695,6 +2695,9 @@ static struct pci_error_handlers atl1c_e
+ 
+ static SIMPLE_DEV_PM_OPS(atl1c_pm_ops, atl1c_suspend, atl1c_resume);
+ 
++compat_pci_suspend(atl1c_suspend)
++compat_pci_resume(atl1c_resume)
++
+ static struct pci_driver atl1c_driver = {
+ 	.name     = atl1c_driver_name,
+ 	.id_table = atl1c_pci_tbl,
+@@ -2702,7 +2705,12 @@ static struct pci_driver atl1c_driver =
+ 	.remove   = __devexit_p(atl1c_remove),
+ 	.shutdown = atl1c_shutdown,
+ 	.err_handler = &atl1c_err_handler,
++#if (LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,29))
+ 	.driver.pm = &atl1c_pm_ops,
++#elif defined(CONFIG_PM_SLEEP)
++	.suspend        = atl1c_suspend_compat,
++	.resume         = atl1c_resume_compat,
++#endif
+ };
+ 
+ /*
+--- a/drivers/net/ethernet/atheros/atlx/atl1.c
++++ b/drivers/net/ethernet/atheros/atlx/atl1.c
+@@ -2884,6 +2884,9 @@ static int atl1_resume(struct device *de
+ 	return 0;
+ }
+ 
++compat_pci_suspend(atl1_suspend)
++compat_pci_resume(atl1_resume)
++
+ static SIMPLE_DEV_PM_OPS(atl1_pm_ops, atl1_suspend, atl1_resume);
+ #define ATL1_PM_OPS	(&atl1_pm_ops)
+ 
+@@ -3155,7 +3158,12 @@ static struct pci_driver atl1_driver = {
+ 	.probe = atl1_probe,
+ 	.remove = __devexit_p(atl1_remove),
+ 	.shutdown = atl1_shutdown,
++#if (LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,29))
+ 	.driver.pm = ATL1_PM_OPS,
++#elif defined(CONFIG_PM_SLEEP)
++	.suspend        = atl1_suspend_compat,
++	.resume         = atl1_resume_compat,
++#endif
+ };
+ 
+ /*
+--- a/drivers/net/wireless/ath/ath5k/pci.c
++++ b/drivers/net/wireless/ath/ath5k/pci.c
+@@ -326,6 +326,9 @@ static int ath5k_pci_resume(struct devic
+ 	return 0;
+ }
+ 
++compat_pci_suspend(ath5k_pci_suspend)
++compat_pci_resume(ath5k_pci_resume)
++
+ static SIMPLE_DEV_PM_OPS(ath5k_pm_ops, ath5k_pci_suspend, ath5k_pci_resume);
+ #define ATH5K_PM_OPS	(&ath5k_pm_ops)
+ #else
+@@ -337,7 +340,12 @@ static struct pci_driver ath5k_pci_drive
+ 	.id_table	= ath5k_pci_id_table,
+ 	.probe		= ath5k_pci_probe,
+ 	.remove		= __devexit_p(ath5k_pci_remove),
++#if (LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,29))
+ 	.driver.pm	= ATH5K_PM_OPS,
++#elif defined(CONFIG_PM_SLEEP)
++	.suspend        = ath5k_pci_suspend_compat,
++	.resume         = ath5k_pci_resume_compat,
++#endif
+ };
+ 
+ module_pci_driver(ath5k_pci_driver);
+--- a/drivers/net/wireless/ath/ath9k/pci.c
++++ b/drivers/net/wireless/ath/ath9k/pci.c
+@@ -335,14 +335,10 @@ static int ath_pci_resume(struct device
+ 	return 0;
+ }
+ 
+-static const struct dev_pm_ops ath9k_pm_ops = {
+-	.suspend = ath_pci_suspend,
+-	.resume = ath_pci_resume,
+-	.freeze = ath_pci_suspend,
+-	.thaw = ath_pci_resume,
+-	.poweroff = ath_pci_suspend,
+-	.restore = ath_pci_resume,
+-};
++compat_pci_suspend(ath_pci_suspend)
++compat_pci_resume(ath_pci_resume)
++
++static SIMPLE_DEV_PM_OPS(ath9k_pm_ops, ath_pci_suspend, ath_pci_resume);
+ 
+ #define ATH9K_PM_OPS	(&ath9k_pm_ops)
+ 
+@@ -360,7 +356,12 @@ static struct pci_driver ath_pci_driver
+ 	.id_table   = ath_pci_id_table,
+ 	.probe      = ath_pci_probe,
+ 	.remove     = ath_pci_remove,
++#if (LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,29))
+ 	.driver.pm  = ATH9K_PM_OPS,
++#elif defined(CONFIG_PM)
++	.suspend    = ath_pci_suspend_compat,
++	.resume     = ath_pci_resume_compat,
++#endif
+ };
+ 
+ int ath_pci_init(void)
+--- a/drivers/net/wireless/iwlegacy/3945-mac.c
++++ b/drivers/net/wireless/iwlegacy/3945-mac.c
+@@ -3881,7 +3881,12 @@ static struct pci_driver il3945_driver =
+ 	.id_table = il3945_hw_card_ids,
+ 	.probe = il3945_pci_probe,
+ 	.remove = __devexit_p(il3945_pci_remove),
++#if (LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,29))
+ 	.driver.pm = IL_LEGACY_PM_OPS,
++#elif defined(CONFIG_PM)
++	.suspend = il_pci_suspend_compat,
++	.resume = il_pci_resume_compat,
++#endif
+ };
+ 
+ static int __init
+--- a/drivers/net/wireless/iwlegacy/4965-mac.c
++++ b/drivers/net/wireless/iwlegacy/4965-mac.c
+@@ -6758,7 +6758,12 @@ static struct pci_driver il4965_driver =
+ 	.id_table = il4965_hw_card_ids,
+ 	.probe = il4965_pci_probe,
+ 	.remove = __devexit_p(il4965_pci_remove),
++#if (LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,29))
+ 	.driver.pm = IL_LEGACY_PM_OPS,
++#elif defined(CONFIG_PM)
++	.suspend = il_pci_suspend_compat,
++	.resume = il_pci_resume_compat,
++#endif
+ };
+ 
+ static int __init
+--- a/drivers/net/wireless/iwlegacy/common.c
++++ b/drivers/net/wireless/iwlegacy/common.c
+@@ -4909,15 +4909,17 @@ il_pci_resume(struct device *device)
+ }
+ EXPORT_SYMBOL(il_pci_resume);
+ 
+-const struct dev_pm_ops il_pm_ops = {
+-	.suspend = il_pci_suspend,
+-	.resume = il_pci_resume,
+-	.freeze = il_pci_suspend,
+-	.thaw = il_pci_resume,
+-	.poweroff = il_pci_suspend,
+-	.restore = il_pci_resume,
+-};
++const SIMPLE_DEV_PM_OPS(il_pm_ops, il_pci_suspend, il_pci_resume);
++
++compat_pci_suspend(il_pci_suspend)
++compat_pci_resume(il_pci_resume)
++
++#if (LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,29))
+ EXPORT_SYMBOL(il_pm_ops);
++#else
++EXPORT_SYMBOL(il_pci_suspend_compat);
++EXPORT_SYMBOL(il_pci_resume_compat);
++#endif
+ 
+ #endif /* CONFIG_PM */
+ 
+--- a/drivers/net/wireless/iwlegacy/common.h
++++ b/drivers/net/wireless/iwlegacy/common.h
+@@ -1847,7 +1847,12 @@ __le32 il_add_beacon_time(struct il_priv
+ #ifdef CONFIG_PM
+ int il_pci_suspend(struct device *device);
+ int il_pci_resume(struct device *device);
++#if (LINUX_VERSION_CODE < KERNEL_VERSION(2,6,29))
++int il_pci_suspend_compat(struct pci_dev *pdev, pm_message_t state);
++int il_pci_resume_compat(struct pci_dev *pdev);
++#else
+ extern const struct dev_pm_ops il_pm_ops;
++#endif
+ 
+ #define IL_LEGACY_PM_OPS	(&il_pm_ops)
+ 
+--- a/drivers/net/wireless/iwlwifi/iwl-pci.c
++++ b/drivers/net/wireless/iwlwifi/iwl-pci.c
+@@ -338,6 +338,9 @@ static int iwl_pci_resume(struct device
+ 
+ static SIMPLE_DEV_PM_OPS(iwl_dev_pm_ops, iwl_pci_suspend, iwl_pci_resume);
+ 
++compat_pci_suspend(iwl_pci_suspend)
++compat_pci_resume(iwl_pci_resume)
++
+ #define IWL_PM_OPS	(&iwl_dev_pm_ops)
+ 
+ #else
+@@ -360,7 +363,12 @@ static struct pci_driver iwl_pci_driver
+ 	.id_table = iwl_hw_card_ids,
+ 	.probe = iwl_pci_probe,
+ 	.remove = __devexit_p(iwl_pci_remove),
++#if (LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,29))
+ 	.driver.pm = IWL_PM_OPS,
++#elif defined(CONFIG_PM)
++	.suspend = iwl_pci_suspend_compat,
++	.resume = iwl_pci_resume_compat,
++#endif
+ };
+ 
+ int __must_check iwl_pci_register_driver(void)
+--- a/drivers/net/wireless/libertas/if_spi.c
++++ b/drivers/net/wireless/libertas/if_spi.c
+@@ -1249,6 +1249,7 @@ static int __devexit libertas_spi_remove
+ 	return 0;
+ }
+ 
++#if (LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,29))
+ static int if_spi_suspend(struct device *dev)
+ {
+ 	struct spi_device *spi = to_spi_device(dev);
+@@ -1282,6 +1283,7 @@ static const struct dev_pm_ops if_spi_pm
+ 	.suspend	= if_spi_suspend,
+ 	.resume		= if_spi_resume,
+ };
++#endif
+ 
+ static struct spi_driver libertas_spi_driver = {
+ 	.probe	= if_spi_probe,
+@@ -1289,7 +1291,9 @@ static struct spi_driver libertas_spi_dr
+ 	.driver = {
+ 		.name	= "libertas_spi",
+ 		.owner	= THIS_MODULE,
++#if (LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,29))
+ 		.pm	= &if_spi_pm_ops,
++#endif
+ 	},
+ };
+ 
+--- a/drivers/net/wireless/rtlwifi/rtl8192ce/sw.c
++++ b/drivers/net/wireless/rtlwifi/rtl8192ce/sw.c
+@@ -372,21 +372,22 @@ MODULE_PARM_DESC(swlps, "Set to 1 to use
+ MODULE_PARM_DESC(fwlps, "Set to 1 to use FW control power save (default 1)\n");
+ MODULE_PARM_DESC(debug, "Set debug level (0-5) (default 0)");
+ 
+-static const struct dev_pm_ops rtlwifi_pm_ops = {
+-	.suspend = rtl_pci_suspend,
+-	.resume = rtl_pci_resume,
+-	.freeze = rtl_pci_suspend,
+-	.thaw = rtl_pci_resume,
+-	.poweroff = rtl_pci_suspend,
+-	.restore = rtl_pci_resume,
+-};
++static const SIMPLE_DEV_PM_OPS(rtlwifi_pm_ops, rtl_pci_suspend, rtl_pci_resume);
++
++compat_pci_suspend(rtl_pci_suspend)
++compat_pci_resume(rtl_pci_resume)
+ 
+ static struct pci_driver rtl92ce_driver = {
+ 	.name = KBUILD_MODNAME,
+ 	.id_table = rtl92ce_pci_ids,
+ 	.probe = rtl_pci_probe,
+ 	.remove = rtl_pci_disconnect,
++#if (LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,29))
+ 	.driver.pm = &rtlwifi_pm_ops,
++#elif defined(CONFIG_PM)
++	.suspend    = rtl_pci_suspend_compat,
++	.resume     = rtl_pci_resume_compat,
++#endif
+ };
+ 
+ module_pci_driver(rtl92ce_driver);
+--- a/drivers/net/wireless/rtlwifi/rtl8192de/sw.c
++++ b/drivers/net/wireless/rtlwifi/rtl8192de/sw.c
+@@ -378,21 +378,22 @@ MODULE_PARM_DESC(swlps, "Set to 1 to use
+ MODULE_PARM_DESC(fwlps, "Set to 1 to use FW control power save (default 1)\n");
+ MODULE_PARM_DESC(debug, "Set debug level (0-5) (default 0)");
+ 
+-static const struct dev_pm_ops rtlwifi_pm_ops = {
+-	.suspend = rtl_pci_suspend,
+-	.resume = rtl_pci_resume,
+-	.freeze = rtl_pci_suspend,
+-	.thaw = rtl_pci_resume,
+-	.poweroff = rtl_pci_suspend,
+-	.restore = rtl_pci_resume,
+-};
++static const SIMPLE_DEV_PM_OPS(rtlwifi_pm_ops, rtl_pci_suspend, rtl_pci_resume);
++
++compat_pci_suspend(rtl_pci_suspend)
++compat_pci_resume(rtl_pci_resume)
+ 
+ static struct pci_driver rtl92de_driver = {
+ 	.name = KBUILD_MODNAME,
+ 	.id_table = rtl92de_pci_ids,
+ 	.probe = rtl_pci_probe,
+ 	.remove = rtl_pci_disconnect,
++#if (LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,29))
+ 	.driver.pm = &rtlwifi_pm_ops,
++#elif defined(CONFIG_PM)
++	.suspend    = rtl_pci_suspend_compat,
++	.resume     = rtl_pci_resume_compat,
++#endif
+ };
+ 
+ /* add global spin lock to solve the problem that
+--- a/drivers/net/wireless/rtlwifi/rtl8192se/sw.c
++++ b/drivers/net/wireless/rtlwifi/rtl8192se/sw.c
+@@ -433,21 +433,22 @@ MODULE_PARM_DESC(swlps, "Set to 1 to use
+ MODULE_PARM_DESC(fwlps, "Set to 1 to use FW control power save (default 1)\n");
+ MODULE_PARM_DESC(debug, "Set debug level (0-5) (default 0)");
+ 
+-static const struct dev_pm_ops rtlwifi_pm_ops = {
+-	.suspend = rtl_pci_suspend,
+-	.resume = rtl_pci_resume,
+-	.freeze = rtl_pci_suspend,
+-	.thaw = rtl_pci_resume,
+-	.poweroff = rtl_pci_suspend,
+-	.restore = rtl_pci_resume,
+-};
++static const SIMPLE_DEV_PM_OPS(rtlwifi_pm_ops, rtl_pci_suspend, rtl_pci_resume);
++
++compat_pci_suspend(rtl_pci_suspend)
++compat_pci_resume(rtl_pci_resume)
+ 
+ static struct pci_driver rtl92se_driver = {
+ 	.name = KBUILD_MODNAME,
+ 	.id_table = rtl92se_pci_ids,
+ 	.probe = rtl_pci_probe,
+ 	.remove = rtl_pci_disconnect,
++#if (LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,29))
+ 	.driver.pm = &rtlwifi_pm_ops,
++#elif defined(CONFIG_PM)
++	.suspend    = rtl_pci_suspend_compat,
++	.resume     = rtl_pci_resume_compat,
++#endif
+ };
+ 
+ module_pci_driver(rtl92se_driver);
+--- a/drivers/net/wireless/p54/p54pci.c
++++ b/drivers/net/wireless/p54/p54pci.c
+@@ -645,14 +645,10 @@ static int p54p_resume(struct device *de
+ 	return pci_set_power_state(pdev, PCI_D0);
+ }
+ 
+-static const struct dev_pm_ops p54pci_pm_ops = {
+-	.suspend = p54p_suspend,
+-	.resume = p54p_resume,
+-	.freeze = p54p_suspend,
+-	.thaw = p54p_resume,
+-	.poweroff = p54p_suspend,
+-	.restore = p54p_resume,
+-};
++compat_pci_suspend(p54p_suspend)
++compat_pci_resume(p54p_resume)
++
++static SIMPLE_DEV_PM_OPS(p54pci_pm_ops, p54p_suspend, p54p_resume);
+ 
+ #define P54P_PM_OPS (&p54pci_pm_ops)
+ #else
+@@ -664,7 +660,12 @@ static struct pci_driver p54p_driver = {
+ 	.id_table	= p54p_table,
+ 	.probe		= p54p_probe,
+ 	.remove		= __devexit_p(p54p_remove),
++#if (LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,29))
+ 	.driver.pm	= P54P_PM_OPS,
++#elif defined(CONFIG_PM)
++	.suspend    = p54p_suspend_compat,
++	.resume     = p54p_resume_compat,
++#endif
+ };
+ 
+ module_pci_driver(p54p_driver);

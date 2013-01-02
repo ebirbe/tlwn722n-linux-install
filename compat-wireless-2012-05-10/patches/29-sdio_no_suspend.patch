@@ -1,0 +1,171 @@
+Starting with commit 66fceb69b72ff7e9cd8da2ca70033982d5376e0e
+"libertas: Added callback functions to support SDIO suspend/resume."
+libertas uses new functions from the in kernel sdio framework for
+suspend and resume that are not backported.
+
+--- a/drivers/net/wireless/ath/ath6kl/sdio.c
++++ b/drivers/net/wireless/ath/ath6kl/sdio.c
+@@ -807,6 +807,7 @@ out:
+ 	return ret;
+ }
+ 
++#if (LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,34))
+ static int ath6kl_set_sdio_pm_caps(struct ath6kl *ar)
+ {
+ 	struct ath6kl_sdio *ar_sdio = ath6kl_sdio_priv(ar);
+@@ -953,6 +954,17 @@ static int ath6kl_sdio_resume(struct ath
+ 
+ 	return 0;
+ }
++#else
++static int ath6kl_sdio_suspend(struct ath6kl *ar, struct cfg80211_wowlan *wow)
++{
++	return 0;
++}
++
++static int ath6kl_sdio_resume(struct ath6kl *ar)
++{
++	return 0;
++}
++#endif /* (LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,34)) */
+ 
+ /* set the window address register (using 4-byte register access ). */
+ static int ath6kl_set_addrwin_reg(struct ath6kl *ar, u32 reg_addr, u32 addr)
+@@ -1265,7 +1277,7 @@ static const struct ath6kl_hif_ops ath6k
+ 	.stop = ath6kl_sdio_stop,
+ };
+ 
+-#ifdef CONFIG_PM_SLEEP
++#if defined(CONFIG_PM_SLEEP) && (LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,34))
+ 
+ /*
+  * Empty handlers so that mmc subsystem doesn't remove us entirely during
+@@ -1415,7 +1427,9 @@ static struct sdio_driver ath6kl_sdio_dr
+ 	.id_table = ath6kl_sdio_devices,
+ 	.probe = ath6kl_sdio_probe,
+ 	.remove = ath6kl_sdio_remove,
++#if (LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,34))
+ 	.drv.pm = ATH6KL_SDIO_PM_OPS,
++#endif
+ };
+ 
+ static int __init ath6kl_sdio_init(void)
+--- a/drivers/net/wireless/libertas/if_sdio.c
++++ b/drivers/net/wireless/libertas/if_sdio.c
+@@ -1319,6 +1319,7 @@ static void if_sdio_remove(struct sdio_f
+ 	lbs_deb_leave(LBS_DEB_SDIO);
+ }
+ 
++#if (LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,34))
+ static int if_sdio_suspend(struct device *dev)
+ {
+ 	struct sdio_func *func = dev_to_sdio_func(dev);
+@@ -1372,15 +1373,18 @@ static const struct dev_pm_ops if_sdio_p
+ 	.suspend	= if_sdio_suspend,
+ 	.resume		= if_sdio_resume,
+ };
++#endif /* (LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,34)) */
+ 
+ static struct sdio_driver if_sdio_driver = {
+ 	.name		= "libertas_sdio",
+ 	.id_table	= if_sdio_ids,
+ 	.probe		= if_sdio_probe,
+ 	.remove		= if_sdio_remove,
++#if (LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,34))
+ 	.drv = {
+ 		.pm = &if_sdio_pm_ops,
+ 	},
++#endif /* (LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,34)) */
+ };
+ 
+ /*******************************************************************/
+--- a/drivers/net/wireless/mwifiex/sdio.c
++++ b/drivers/net/wireless/mwifiex/sdio.c
+@@ -129,8 +129,10 @@ mwifiex_sdio_remove(struct sdio_func *fu
+ 	wait_for_completion(&adapter->fw_load);
+ 
+ 	if (user_rmmod) {
++#if (LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,34))
+ 		if (adapter->is_suspended)
+ 			mwifiex_sdio_resume(adapter->dev);
++#endif /* (LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,34)) */
+ 
+ 		for (i = 0; i < adapter->priv_num; i++)
+ 			if ((GET_BSS_ROLE(adapter->priv[i]) ==
+@@ -147,6 +149,7 @@ mwifiex_sdio_remove(struct sdio_func *fu
+ 	kfree(card);
+ }
+ 
++#if (LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,34))
+ /*
+  * SDIO suspend.
+  *
+@@ -254,6 +257,7 @@ static int mwifiex_sdio_resume(struct de
+ 
+ 	return 0;
+ }
++#endif /* (LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,34)) */
+ 
+ /* Device ID for SD8786 */
+ #define SDIO_DEVICE_ID_MARVELL_8786   (0x9116)
+@@ -272,10 +276,12 @@ static const struct sdio_device_id mwifi
+ 
+ MODULE_DEVICE_TABLE(sdio, mwifiex_ids);
+ 
++#if (LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,34))
+ static const struct dev_pm_ops mwifiex_sdio_pm_ops = {
+ 	.suspend = mwifiex_sdio_suspend,
+ 	.resume = mwifiex_sdio_resume,
+ };
++#endif /* (LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,34)) */
+ 
+ static struct sdio_driver mwifiex_sdio = {
+ 	.name = "mwifiex_sdio",
+@@ -284,7 +290,9 @@ static struct sdio_driver mwifiex_sdio =
+ 	.remove = mwifiex_sdio_remove,
+ 	.drv = {
+ 		.owner = THIS_MODULE,
++#if (LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,34))
+ 		.pm = &mwifiex_sdio_pm_ops,
++#endif /* (LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,34)) */
+ 	}
+ };
+ 
+--- a/drivers/net/wireless/brcm80211/brcmfmac/bcmsdh_sdmmc.c
++++ b/drivers/net/wireless/brcm80211/brcmfmac/bcmsdh_sdmmc.c
+@@ -69,7 +69,7 @@ static bool
+ brcmf_pm_resume_error(struct brcmf_sdio_dev *sdiodev)
+ {
+ 	bool is_err = false;
+-#ifdef CONFIG_PM_SLEEP
++#if defined(CONFIG_PM_SLEEP) && (LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,34))
+ 	is_err = atomic_read(&sdiodev->suspend);
+ #endif
+ 	return is_err;
+@@ -78,7 +78,7 @@ brcmf_pm_resume_error(struct brcmf_sdio_
+ static void
+ brcmf_pm_resume_wait(struct brcmf_sdio_dev *sdiodev, wait_queue_head_t *wq)
+ {
+-#ifdef CONFIG_PM_SLEEP
++#if defined(CONFIG_PM_SLEEP) && (LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,34))
+ 	int retry = 0;
+ 	while (atomic_read(&sdiodev->suspend) && retry++ != 30)
+ 		wait_event_timeout(*wq, false, HZ/100);
+@@ -589,7 +589,7 @@ static void brcmf_ops_sdio_remove(struct
+ 	}
+ }
+ 
+-#ifdef CONFIG_PM_SLEEP
++#if defined(CONFIG_PM_SLEEP) && (LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,34))
+ static int brcmf_sdio_suspend(struct device *dev)
+ {
+ 	mmc_pm_flag_t sdio_flags;
+@@ -639,7 +639,7 @@ static struct sdio_driver brcmf_sdmmc_dr
+ 	.remove = brcmf_ops_sdio_remove,
+ 	.name = "brcmfmac",
+ 	.id_table = brcmf_sdmmc_ids,
+-#ifdef CONFIG_PM_SLEEP
++#if defined(CONFIG_PM_SLEEP) && (LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,34))
+ 	.drv = {
+ 		.pm = &brcmf_sdio_pm_ops,
+ 	},

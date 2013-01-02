@@ -1,0 +1,132 @@
+The only other namespace change. Note that pach 01-netdev.patch
+also has some other namespace changes there, look at that file
+for the other changes. It'd be nice to figure out a way to
+bring thise here cleanly and seprately but they touch the same
+files...
+
+--- a/net/wireless/nl80211.c
++++ b/net/wireless/nl80211.c
+@@ -5343,7 +5343,9 @@ static int nl80211_wiphy_netns(struct sk
+ 	if (!net_eq(wiphy_net(&rdev->wiphy), net))
+ 		err = cfg80211_switch_netns(rdev, net);
+ 
++#if (LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,24))
+ 	put_net(net);
++#endif
+ 	return err;
+ }
+ 
+--- a/net/wireless/core.c
++++ b/net/wireless/core.c
+@@ -230,6 +230,7 @@ int cfg80211_dev_rename(struct cfg80211_
+ 	return 0;
+ }
+ 
++#if (LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,24))
+ int cfg80211_switch_netns(struct cfg80211_registered_device *rdev,
+ 			  struct net *net)
+ {
+@@ -270,6 +271,7 @@ int cfg80211_switch_netns(struct cfg8021
+ 
+ 	return 0;
+ }
++#endif
+ 
+ static void cfg80211_rfkill_poll(struct rfkill *rfkill, void *data)
+ {
+@@ -384,7 +386,9 @@ struct wiphy *wiphy_new(const struct cfg
+ 	rdev->wiphy.flags |= WIPHY_FLAG_PS_ON_BY_DEFAULT;
+ #endif
+ 
++#if (LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,24))
+ 	wiphy_net_set(&rdev->wiphy, &init_net);
++#endif
+ 
+ 	rdev->rfkill_ops.set_block = cfg80211_rfkill_set_block;
+ 	rdev->rfkill = rfkill_alloc(dev_name(&rdev->wiphy.dev),
+@@ -812,8 +816,10 @@ static int cfg80211_netdev_notifier_call
+ 		mutex_lock(&rdev->devlist_mtx);
+ 		list_add_rcu(&wdev->list, &rdev->netdev_list);
+ 		rdev->devlist_generation++;
++#if (LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,24))
+ 		/* can only change netns with wiphy */
+ 		dev->features |= NETIF_F_NETNS_LOCAL;
++#endif
+ 
+ 		if (sysfs_create_link(&dev->dev.kobj, &rdev->wiphy.dev.kobj,
+ 				      "phy80211")) {
+@@ -993,6 +999,7 @@ static struct notifier_block cfg80211_ne
+ 	.notifier_call = cfg80211_netdev_notifier_call,
+ };
+ 
++#if (LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,24))
+ static void __net_exit cfg80211_pernet_exit(struct net *net)
+ {
+ 	struct cfg80211_registered_device *rdev;
+@@ -1010,14 +1017,17 @@ static void __net_exit cfg80211_pernet_e
+ static struct pernet_operations cfg80211_pernet_ops = {
+ 	.exit = cfg80211_pernet_exit,
+ };
++#endif
+ 
+ static int __init cfg80211_init(void)
+ {
+ 	int err;
+ 
++#if (LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,24))
+ 	err = register_pernet_device(&cfg80211_pernet_ops);
+ 	if (err)
+ 		goto out_fail_pernet;
++#endif
+ 
+ 	err = wiphy_sysfs_init();
+ 	if (err)
+@@ -1052,8 +1062,10 @@ out_fail_nl80211:
+ out_fail_notifier:
+ 	wiphy_sysfs_exit();
+ out_fail_sysfs:
++#if (LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,24))
+ 	unregister_pernet_device(&cfg80211_pernet_ops);
+ out_fail_pernet:
++#endif
+ 	return err;
+ }
+ subsys_initcall(cfg80211_init);
+@@ -1065,7 +1077,9 @@ static void __exit cfg80211_exit(void)
+ 	unregister_netdevice_notifier(&cfg80211_netdev_notifier);
+ 	wiphy_sysfs_exit();
+ 	regulatory_exit();
++#if (LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,24))
+ 	unregister_pernet_device(&cfg80211_pernet_ops);
++#endif
+ 	destroy_workqueue(cfg80211_wq);
+ }
+ module_exit(cfg80211_exit);
+--- a/net/wireless/wext-core.c
++++ b/net/wireless/wext-core.c
+@@ -401,7 +401,11 @@ static void wireless_nlevent_process(uns
+ {
+ 	struct sk_buff *skb;
+ 	while ((skb = skb_dequeue(&wireless_nlevent_queue)))
++#if (LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,24))
+ 		rtnl_notify(skb, &init_net, 0, RTNLGRP_LINK, NULL, GFP_ATOMIC);
++#else
++		rtnl_notify(skb, 0, RTNLGRP_LINK, NULL, GFP_ATOMIC);
++#endif
+ }
+ 
+ static DECLARE_TASKLET(wireless_nlevent_tasklet, wireless_nlevent_process, 0);
+--- a/net/wireless/wext-proc.c
++++ b/net/wireless/wext-proc.c
+@@ -98,7 +98,11 @@ static void *wireless_dev_seq_start(stru
+ 		return SEQ_START_TOKEN;
+ 
+ 	off = 1;
++#if (LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,24))
+ 	for_each_netdev(net, dev)
++#else
++	for_each_netdev(net)
++#endif
+ 		if (off++ == *pos)
+ 			return dev;
+ 	return NULL;

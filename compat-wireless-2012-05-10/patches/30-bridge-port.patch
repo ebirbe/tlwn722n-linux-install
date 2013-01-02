@@ -1,0 +1,45 @@
+The patch titled:
+
+    bridge: use rx_handler_data pointer to store net_bridge_port pointer
+   
+by Jiri Pirko <jpirko@redhat.com> moved the br_ports pointer
+out of the netdev which older kernels relied on and then added
+a flag to the netdev to check for it as follows:
+
+-                               dev->br_port) {
++                   (dev->priv_flags & IFF_BRIDGE_PORT)) {
+
+So to backport this we instead rely on a br_port_exists() call
+which compat.git provides and depending on the kernel it will either
+check for the dev->br_port or the IFF_BRIDGE_PORT flag. A patch
+to get the blow code merged upstream and to use br_port_exists()
+everywhere else will be submitted but not sure if it will be
+accepted.
+
+This patch can be removed once we get br_port_exists() accessible
+to drivers and not just private bridge code. If that patch doesn't
+get accepted upstream we'l have to carry this patch around for
+compat-wireless.
+
+--- a/net/wireless/util.c
++++ b/net/wireless/util.c
+@@ -799,7 +799,7 @@ int cfg80211_change_iface(struct cfg8021
+ 		return -EOPNOTSUPP;
+ 
+ 	/* if it's part of a bridge, reject changing type to station/ibss */
+-	if ((dev->priv_flags & IFF_BRIDGE_PORT) &&
++	if (br_port_exists(dev) &&
+ 	    (ntype == NL80211_IFTYPE_ADHOC ||
+ 	     ntype == NL80211_IFTYPE_STATION ||
+ 	     ntype == NL80211_IFTYPE_P2P_CLIENT))
+--- a/net/wireless/nl80211.c
++++ b/net/wireless/nl80211.c
+@@ -1659,7 +1659,7 @@ static int nl80211_valid_4addr(struct cf
+ 			       enum nl80211_iftype iftype)
+ {
+ 	if (!use_4addr) {
+-		if (netdev && (netdev->priv_flags & IFF_BRIDGE_PORT))
++		if (netdev && br_port_exists(netdev))
+ 			return -EBUSY;
+ 		return 0;
+ 	}

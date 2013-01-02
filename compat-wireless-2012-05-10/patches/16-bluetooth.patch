@@ -1,0 +1,574 @@
+These changes are required to backport blueooth. A lot can be optimized
+here still, but for now we keep this here.
+
+--- a/drivers/bluetooth/hci_ldisc.c
++++ b/drivers/bluetooth/hci_ldisc.c
+@@ -271,8 +271,13 @@ static int hci_uart_tty_open(struct tty_
+ 	/* FIXME: why is this needed. Note don't use ldisc_ref here as the
+ 	   open path is before the ldisc is referencable */
+ 
++#if (LINUX_VERSION_CODE > KERNEL_VERSION(2,6,30))
+ 	if (tty->ldisc->ops->flush_buffer)
+ 		tty->ldisc->ops->flush_buffer(tty);
++#else
++	if (tty->ldisc.ops->flush_buffer)
++		tty->ldisc.ops->flush_buffer(tty);
++#endif
+ 	tty_driver_flush_buffer(tty);
+ 
+ 	return 0;
+@@ -491,7 +496,11 @@ static int hci_uart_tty_ioctl(struct tty
+ 		return hu->hdev_flags;
+ 
+ 	default:
++#if (LINUX_VERSION_CODE > KERNEL_VERSION(2,6,27))
+ 		err = n_tty_ioctl_helper(tty, file, cmd, arg);
++#else
++		err = n_tty_ioctl(tty, file, cmd, arg);
++#endif
+ 		break;
+ 	};
+ 
+--- a/net/bluetooth/af_bluetooth.c
++++ b/net/bluetooth/af_bluetooth.c
+@@ -122,8 +122,12 @@ int bt_sock_unregister(int proto)
+ }
+ EXPORT_SYMBOL(bt_sock_unregister);
+ 
++#if defined(CONFIG_COMPAT_BT_SOCK_CREATE_NEEDS_KERN)
+ static int bt_sock_create(struct net *net, struct socket *sock, int proto,
+ 			  int kern)
++#else
++static int bt_sock_create(struct net *net, struct socket *sock, int proto)
++#endif
+ {
+ 	int err;
+ 
+@@ -141,7 +145,11 @@ static int bt_sock_create(struct net *ne
+ 	read_lock(&bt_proto_lock);
+ 
+ 	if (bt_proto[proto] && try_module_get(bt_proto[proto]->owner)) {
++#if defined(CONFIG_COMPAT_BT_SOCK_CREATE_NEEDS_KERN)
+ 		err = bt_proto[proto]->create(net, sock, proto, kern);
++#else
++		err = bt_proto[proto]->create(net, sock, proto);
++#endif
+ 		if (!err)
+ 			bt_sock_reclassify_lock(sock->sk, proto);
+ 		module_put(bt_proto[proto]->owner);
+@@ -473,7 +481,11 @@ int bt_sock_ioctl(struct socket *sock, u
+ 		if (sk->sk_state == BT_LISTEN)
+ 			return -EINVAL;
+ 
++#if (LINUX_VERSION_CODE > KERNEL_VERSION(2,6,31))
+ 		amount = sk->sk_sndbuf - sk_wmem_alloc_get(sk);
++#else
++		amount = sk->sk_sndbuf - atomic_read(&sk->sk_wmem_alloc);
++#endif
+ 		if (amount < 0)
+ 			amount = 0;
+ 		err = put_user(amount, (int __user *) arg);
+--- a/net/bluetooth/cmtp/capi.c
++++ b/net/bluetooth/cmtp/capi.c
+@@ -384,7 +384,11 @@ static void cmtp_reset_ctr(struct capi_c
+ 
+ 	BT_DBG("ctrl %p", ctrl);
+ 
++#if (LINUX_VERSION_CODE > KERNEL_VERSION(2,6,30))
+ 	capi_ctr_down(ctrl);
++#else
++	capi_ctr_reseted(ctrl);
++#endif
+ 
+ 	atomic_inc(&session->terminate);
+ 	wake_up_process(session->task);
+--- a/net/bluetooth/hci_sock.c
++++ b/net/bluetooth/hci_sock.c
+@@ -891,7 +891,11 @@ drop:
+ 	goto done;
+ }
+ 
++#if (LINUX_VERSION_CODE > KERNEL_VERSION(2,6,31))
+ static int hci_sock_setsockopt(struct socket *sock, int level, int optname, char __user *optval, unsigned int len)
++#else
++static int hci_sock_setsockopt(struct socket *sock, int level, int optname, char __user *optval, int len)
++#endif
+ {
+ 	struct hci_ufilter uf = { .opcode = 0 };
+ 	struct sock *sk = sock->sk;
+@@ -1063,8 +1067,12 @@ static struct proto hci_sk_proto = {
+ 	.obj_size	= sizeof(struct hci_pinfo)
+ };
+ 
++#if defined(CONFIG_COMPAT_BT_SOCK_CREATE_NEEDS_KERN)
+ static int hci_sock_create(struct net *net, struct socket *sock, int protocol,
+ 			   int kern)
++#else
++static int hci_sock_create(struct net *net, struct socket *sock, int protocol)
++#endif
+ {
+ 	struct sock *sk;
+ 
+--- a/net/bluetooth/hci_sysfs.c
++++ b/net/bluetooth/hci_sysfs.c
+@@ -72,7 +72,11 @@ static struct attribute_group bt_link_gr
+ 	.attrs = bt_link_attrs,
+ };
+ 
++#if (LINUX_VERSION_CODE > KERNEL_VERSION(2,6,31))
+ static const struct attribute_group *bt_link_groups[] = {
++#else
++static struct attribute_group *bt_link_groups[] = {
++#endif
+ 	&bt_link_group,
+ 	NULL
+ };
+@@ -141,7 +145,11 @@ void hci_conn_del_sysfs(struct hci_conn
+ 		dev = device_find_child(&conn->dev, NULL, __match_tty);
+ 		if (!dev)
+ 			break;
++#if (LINUX_VERSION_CODE > KERNEL_VERSION(2,6,29))
+ 		device_move(dev, NULL, DPM_ORDER_DEV_LAST);
++#else
++		device_move(dev, NULL);
++#endif
+ 		put_device(dev);
+ 	}
+ 
+@@ -361,7 +369,11 @@ static struct attribute_group bt_host_gr
+ 	.attrs = bt_host_attrs,
+ };
+ 
++#if (LINUX_VERSION_CODE > KERNEL_VERSION(2,6,31))
+ static const struct attribute_group *bt_host_groups[] = {
++#else
++static struct attribute_group *bt_host_groups[] = {
++#endif
+ 	&bt_host_group,
+ 	NULL
+ };
+--- a/net/bluetooth/hidp/core.c
++++ b/net/bluetooth/hidp/core.c
+@@ -398,6 +398,7 @@ err:
+ 	return ret;
+ }
+ 
++#if defined(CONFIG_COMPAT_BT_SOCK_CREATE_NEEDS_KERN)
+ static int hidp_output_raw_report(struct hid_device *hid, unsigned char *data, size_t count,
+ 		unsigned char report_type)
+ {
+@@ -456,6 +457,16 @@ err:
+ 	mutex_unlock(&session->report_mutex);
+ 	return ret;
+ }
++#elif (LINUX_VERSION_CODE > KERNEL_VERSION(2,6,27))
++static int hidp_output_raw_report(struct hid_device *hid, unsigned char *data, size_t count)
++{
++	if (hidp_send_ctrl_message(hid->driver_data,
++			HIDP_TRANS_SET_REPORT | HIDP_DATA_RTYPE_FEATURE,
++			data, count))
++		return -ENOMEM;
++	return count;
++}
++#endif
+ 
+ static void hidp_idle_timeout(unsigned long arg)
+ {
+@@ -757,8 +768,14 @@ static int hidp_session(void *arg)
+ 	}
+ 
+ 	if (session->hid) {
++#if (LINUX_VERSION_CODE > KERNEL_VERSION(2,6,27))
+ 		hid_destroy_device(session->hid);
+ 		session->hid = NULL;
++#else
++		if (session->hid->claimed & HID_CLAIMED_INPUT)
++			hidinput_disconnect(session->hid);
++		hid_free_device(session->hid);
++#endif
+ 	}
+ 
+ 	/* Wakeup user-space polling for socket errors */
+@@ -869,6 +886,70 @@ static void hidp_close(struct hid_device
+ {
+ }
+ 
++#if (LINUX_VERSION_CODE <= KERNEL_VERSION(2,6,27))
++static const struct {
++	__u16 idVendor;
++	__u16 idProduct;
++	unsigned quirks;
++} hidp_blacklist[] = {
++	/* Apple wireless Mighty Mouse */
++	{ 0x05ac, 0x030c, HID_QUIRK_MIGHTYMOUSE | HID_QUIRK_INVERT_HWHEEL },
++
++	{ }	/* Terminating entry */
++};
++static void hidp_setup_quirks(struct hid_device *hid)
++{
++	unsigned int n;
++
++	for (n = 0; hidp_blacklist[n].idVendor; n++)
++		if (hidp_blacklist[n].idVendor == le16_to_cpu(hid->vendor) &&
++				hidp_blacklist[n].idProduct == le16_to_cpu(hid->product))
++			hid->quirks = hidp_blacklist[n].quirks;
++}
++
++static void hidp_setup_hid(struct hidp_session *session,
++				struct hidp_connadd_req *req)
++{
++	struct hid_device *hid = session->hid;
++	struct hid_report *report;
++	bdaddr_t src, dst;
++
++	session->hid = hid;
++
++	hid->driver_data = session;
++
++	baswap(&src, &bt_sk(session->ctrl_sock->sk)->src);
++	baswap(&dst, &bt_sk(session->ctrl_sock->sk)->dst);
++
++	hid->bus     = BUS_BLUETOOTH;
++	hid->vendor  = req->vendor;
++	hid->product = req->product;
++	hid->version = req->version;
++	hid->country = req->country;
++
++	strncpy(hid->name, req->name, 128);
++	strncpy(hid->phys, batostr(&src), 64);
++	strncpy(hid->uniq, batostr(&dst), 64);
++
++	hid->dev = hidp_get_device(session);
++	hid->hid_open  = hidp_open;
++	hid->hid_close = hidp_close;
++
++	hid->hidinput_input_event = hidp_hidinput_event;
++
++	hidp_setup_quirks(hid);
++
++	list_for_each_entry(report, &hid->report_enum[HID_INPUT_REPORT].report_list, list)
++		hidp_send_report(session, report);
++
++	list_for_each_entry(report, &hid->report_enum[HID_FEATURE_REPORT].report_list, list)
++		hidp_send_report(session, report);
++
++	if (hidinput_connect(hid) == 0)
++		hid->claimed |= HID_CLAIMED_INPUT;
++}
++#else
++
+ static int hidp_parse(struct hid_device *hid)
+ {
+ 	struct hidp_session *session = hid->driver_data;
+@@ -956,7 +1037,9 @@ static int hidp_setup_hid(struct hidp_se
+ 	hid->dev.parent = &session->conn->dev;
+ 	hid->ll_driver = &hidp_hid_driver;
+ 
++#if (LINUX_VERSION_CODE > KERNEL_VERSION(2,6,38))
+ 	hid->hid_get_raw_report = hidp_get_raw_report;
++#endif
+ 	hid->hid_output_raw_report = hidp_output_raw_report;
+ 
+ 	return 0;
+@@ -967,6 +1050,7 @@ fault:
+ 
+ 	return err;
+ }
++#endif
+ 
+ int hidp_add_connection(struct hidp_connadd_req *req, struct socket *ctrl_sock, struct socket *intr_sock)
+ {
+@@ -982,6 +1066,39 @@ int hidp_add_connection(struct hidp_conn
+ 
+ 	BT_DBG("rd_data %p rd_size %d", req->rd_data, req->rd_size);
+ 
++#if (LINUX_VERSION_CODE <= KERNEL_VERSION(2,6,27))
++	if (req->rd_size > 0) {
++		unsigned char *buf = kmalloc(req->rd_size, GFP_KERNEL);
++
++		if (!buf) {
++			kfree(session);
++			return -ENOMEM;
++		}
++
++		if (copy_from_user(buf, req->rd_data, req->rd_size)) {
++			kfree(buf);
++			kfree(session);
++			return -EFAULT;
++		}
++
++		session->hid = hid_parse_report(buf, req->rd_size);
++
++		kfree(buf);
++
++		if (!session->hid) {
++			kfree(session);
++			return -EINVAL;
++		}
++	}
++
++	if (!session->hid) {
++		session->input = input_allocate_device();
++		if (!session->input) {
++			kfree(session);
++			return -ENOMEM;
++		}
++	}
++#endif
+ 	down_write(&hidp_session_sem);
+ 
+ 	s = __hidp_get_session(&bt_sk(ctrl_sock->sk)->dst);
+@@ -1029,6 +1146,7 @@ int hidp_add_connection(struct hidp_conn
+ 
+ 	__hidp_link_session(session);
+ 
++#if (LINUX_VERSION_CODE > KERNEL_VERSION(2,6,27))
+ 	if (req->rd_size > 0) {
+ 		err = hidp_setup_hid(session, req);
+ 		if (err)
+@@ -1040,6 +1158,16 @@ int hidp_add_connection(struct hidp_conn
+ 		if (err < 0)
+ 			goto purge;
+ 	}
++#else
++	if (session->input) {
++		err = hidp_setup_input(session, req);
++		if (err < 0)
++			goto failed;
++	}
++
++	if (session->hid)
++		hidp_setup_hid(session, req);
++#endif
+ 
+ 	hidp_set_timer(session);
+ 
+@@ -1098,6 +1226,7 @@ unlink:
+ 		session->input = NULL;
+ 	}
+ 
++#if (LINUX_VERSION_CODE > KERNEL_VERSION(2,6,27))
+ 	if (session->hid) {
+ 		hid_destroy_device(session->hid);
+ 		session->hid = NULL;
+@@ -1111,10 +1240,15 @@ purge:
+ 
+ 	skb_queue_purge(&session->ctrl_transmit);
+ 	skb_queue_purge(&session->intr_transmit);
++#endif
+ 
+ failed:
+ 	up_write(&hidp_session_sem);
+ 
++#if (LINUX_VERSION_CODE <= KERNEL_VERSION(2,6,27))
++	if (session->hid)
++		hid_free_device(session->hid);
++#endif
+ 	kfree(session);
+ 	return err;
+ }
+--- a/net/bluetooth/rfcomm/sock.c
++++ b/net/bluetooth/rfcomm/sock.c
+@@ -324,8 +324,13 @@ static struct sock *rfcomm_sock_alloc(st
+ 	return sk;
+ }
+ 
++#if defined(CONFIG_COMPAT_BT_SOCK_CREATE_NEEDS_KERN)
+ static int rfcomm_sock_create(struct net *net, struct socket *sock,
+ 			      int protocol, int kern)
++#else
++static int rfcomm_sock_create(struct net *net, struct socket *sock,
++			      int protocol)
++#endif
+ {
+ 	struct sock *sk;
+ 
+@@ -679,7 +684,11 @@ static int rfcomm_sock_setsockopt_old(st
+ 	return err;
+ }
+ 
++#if (LINUX_VERSION_CODE > KERNEL_VERSION(2,6,31))
+ static int rfcomm_sock_setsockopt(struct socket *sock, int level, int optname, char __user *optval, unsigned int optlen)
++#else
++static int rfcomm_sock_setsockopt(struct socket *sock, int level, int optname, char __user *optval, int optlen)
++#endif
+ {
+ 	struct sock *sk = sock->sk;
+ 	struct bt_security sec;
+--- a/net/bluetooth/rfcomm/tty.c
++++ b/net/bluetooth/rfcomm/tty.c
+@@ -718,8 +718,12 @@ static int rfcomm_tty_open(struct tty_st
+ 	remove_wait_queue(&dev->wait, &wait);
+ 
+ 	if (err == 0)
++#if (LINUX_VERSION_CODE > KERNEL_VERSION(2,6,29))
+ 		device_move(dev->tty_dev, rfcomm_get_device(dev),
+ 			    DPM_ORDER_DEV_AFTER_PARENT);
++#else
++		device_move(dev->tty_dev, rfcomm_get_device(dev));
++#endif
+ 
+ 	rfcomm_tty_copy_pending(dev);
+ 
+@@ -743,7 +747,11 @@ static void rfcomm_tty_close(struct tty_
+ 	if (!--dev->port.count) {
+ 		spin_unlock_irqrestore(&dev->port.lock, flags);
+ 		if (dev->tty_dev->parent)
++#if (LINUX_VERSION_CODE > KERNEL_VERSION(2,6,29))
+ 			device_move(dev->tty_dev, NULL, DPM_ORDER_DEV_LAST);
++#else
++			device_move(dev->tty_dev, NULL);
++#endif
+ 
+ 		/* Close DLC and dettach TTY */
+ 		rfcomm_dlc_close(dev->dlc, 0);
+@@ -819,7 +827,11 @@ static int rfcomm_tty_write_room(struct
+ 	return room;
+ }
+ 
++#if (LINUX_VERSION_CODE > KERNEL_VERSION(2,6,38))
+ static int rfcomm_tty_ioctl(struct tty_struct *tty, unsigned int cmd, unsigned long arg)
++#else
++static int rfcomm_tty_ioctl(struct tty_struct *tty, struct file *filp, unsigned int cmd, unsigned long arg)
++#endif
+ {
+ 	BT_DBG("tty %p cmd 0x%02x", tty, cmd);
+ 
+@@ -1078,7 +1090,11 @@ static void rfcomm_tty_hangup(struct tty
+ 	}
+ }
+ 
++#if (LINUX_VERSION_CODE > KERNEL_VERSION(2,6,38))
+ static int rfcomm_tty_tiocmget(struct tty_struct *tty)
++#else
++static int rfcomm_tty_tiocmget(struct tty_struct *tty, struct file *filp)
++#endif
+ {
+ 	struct rfcomm_dev *dev = (struct rfcomm_dev *) tty->driver_data;
+ 
+@@ -1087,7 +1103,11 @@ static int rfcomm_tty_tiocmget(struct tt
+ 	return dev->modem_status;
+ }
+ 
++#if (LINUX_VERSION_CODE > KERNEL_VERSION(2,6,38))
+ static int rfcomm_tty_tiocmset(struct tty_struct *tty, unsigned int set, unsigned int clear)
++#else
++static int rfcomm_tty_tiocmset(struct tty_struct *tty, struct file *filp, unsigned int set, unsigned int clear)
++#endif
+ {
+ 	struct rfcomm_dev *dev = (struct rfcomm_dev *) tty->driver_data;
+ 	struct rfcomm_dlc *dlc = dev->dlc;
+--- a/net/bluetooth/sco.c
++++ b/net/bluetooth/sco.c
+@@ -440,8 +440,12 @@ static struct sock *sco_sock_alloc(struc
+ 	return sk;
+ }
+ 
++#if defined(CONFIG_COMPAT_BT_SOCK_CREATE_NEEDS_KERN)
+ static int sco_sock_create(struct net *net, struct socket *sock, int protocol,
+ 			   int kern)
++#else
++static int sco_sock_create(struct net *net, struct socket *sock, int protocol)
++#endif
+ {
+ 	struct sock *sk;
+ 
+@@ -670,7 +674,11 @@ static int sco_sock_sendmsg(struct kiocb
+ 	return err;
+ }
+ 
++#if (LINUX_VERSION_CODE > KERNEL_VERSION(2,6,31))
+ static int sco_sock_setsockopt(struct socket *sock, int level, int optname, char __user *optval, unsigned int optlen)
++#else
++static int sco_sock_setsockopt(struct socket *sock, int level, int optname, char __user *optval, int optlen)
++#endif
+ {
+ 	struct sock *sk = sock->sk;
+ 	int err = 0;
+--- a/net/bluetooth/bnep/sock.c
++++ b/net/bluetooth/bnep/sock.c
+@@ -195,8 +195,12 @@ static struct proto bnep_proto = {
+ 	.obj_size	= sizeof(struct bt_sock)
+ };
+ 
++#if defined(CONFIG_COMPAT_BT_SOCK_CREATE_NEEDS_KERN)
+ static int bnep_sock_create(struct net *net, struct socket *sock, int protocol,
+ 			    int kern)
++#else
++static int bnep_sock_create(struct net *net, struct socket *sock, int protocol)
++#endif
+ {
+ 	struct sock *sk;
+ 
+--- a/net/bluetooth/cmtp/sock.c
++++ b/net/bluetooth/cmtp/sock.c
+@@ -189,8 +189,12 @@ static struct proto cmtp_proto = {
+ 	.obj_size	= sizeof(struct bt_sock)
+ };
+ 
++#if defined(CONFIG_COMPAT_BT_SOCK_CREATE_NEEDS_KERN)
+ static int cmtp_sock_create(struct net *net, struct socket *sock, int protocol,
+ 			    int kern)
++#else
++static int cmtp_sock_create(struct net *net, struct socket *sock, int protocol)
++#endif
+ {
+ 	struct sock *sk;
+ 
+--- a/net/bluetooth/hidp/sock.c
++++ b/net/bluetooth/hidp/sock.c
+@@ -242,8 +242,12 @@ static struct proto hidp_proto = {
+ 	.obj_size	= sizeof(struct bt_sock)
+ };
+ 
++#if defined(CONFIG_COMPAT_BT_SOCK_CREATE_NEEDS_KERN)
+ static int hidp_sock_create(struct net *net, struct socket *sock, int protocol,
+ 			    int kern)
++#else
++static int hidp_sock_create(struct net *net, struct socket *sock, int protocol)
++#endif
+ {
+ 	struct sock *sk;
+ 
+--- a/net/bluetooth/l2cap_sock.c
++++ b/net/bluetooth/l2cap_sock.c
+@@ -535,7 +535,14 @@ static int l2cap_sock_setsockopt_old(str
+ 	return err;
+ }
+ 
++
++#if (LINUX_VERSION_CODE > KERNEL_VERSION(2,6,31))
+ static int l2cap_sock_setsockopt(struct socket *sock, int level, int optname, char __user *optval, unsigned int optlen)
++#else
++static int l2cap_sock_setsockopt(struct socket *sock, int level, int optname, char __user *optval, int optlen)
++#endif
++
++
+ {
+ 	struct sock *sk = sock->sk;
+ 	struct l2cap_chan *chan = l2cap_pi(sk)->chan;
+@@ -1067,8 +1074,12 @@ static struct sock *l2cap_sock_alloc(str
+ 	return sk;
+ }
+ 
++#if defined(CONFIG_COMPAT_BT_SOCK_CREATE_NEEDS_KERN)
+ static int l2cap_sock_create(struct net *net, struct socket *sock, int protocol,
+ 			     int kern)
++#else
++static int l2cap_sock_create(struct net *net, struct socket *sock, int protocol)
++#endif
+ {
+ 	struct sock *sk;
+ 
+@@ -1080,7 +1091,11 @@ static int l2cap_sock_create(struct net
+ 			sock->type != SOCK_DGRAM && sock->type != SOCK_RAW)
+ 		return -ESOCKTNOSUPPORT;
+ 
++#if (LINUX_VERSION_CODE > KERNEL_VERSION(2,6,32))
+ 	if (sock->type == SOCK_RAW && !kern && !capable(CAP_NET_RAW))
++#else
++	if (sock->type == SOCK_RAW && !capable(CAP_NET_RAW))
++#endif
+ 		return -EPERM;
+ 
+ 	sock->ops = &l2cap_sock_ops;

@@ -1,0 +1,111 @@
+#!/bin/bash
+#
+# Copyright 2012    Luis R. Rodriguez <mcgrof@frijolero.org>
+#
+# Permission to use, copy, modify, and/or distribute this software for any
+# purpose with or without fee is hereby granted, provided that the above
+# copyright notice and this permission notice appear in all copies.
+#
+# THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES
+# WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF
+# MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR
+# ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES
+# WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN
+# ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
+# OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
+
+# The purpose of this script is to enable developers use compat-wireless
+# backport work without having to carry code on their tree. This lets
+# developers synch to newer compat-wireless releases to gain more backport
+# work. If you use this throw the files into your .gitignore:
+#
+# compat/
+# udev/
+# include/
+# scripts/
+# .compat_base_tree
+# .compat_base_tree_version
+# .compat_version
+# config.mk
+#
+# An example git tree for standalone development will be provided later.
+# Once run you can then just run on your standalone development tree:
+#
+# ./refresh-compat
+#
+# This is a copy of refresh-compat-local that we maintain here
+# You can keep that in your git tree as otherwise its hard for users to
+# know what to run.
+
+# Pretty colors
+GREEN="\033[01;32m"
+YELLOW="\033[01;33m"
+NORMAL="\033[00m"
+BLUE="\033[34m"
+RED="\033[31m"
+PURPLE="\033[35m"
+CYAN="\033[36m"
+UNDERLINE="\033[02m"
+
+COMPAT_SRC="$HOME/devel/compat-wireless/"
+EXTRA_COPY=""
+
+if [[ -f .compat_copy ]]; then
+	source .compat_copy
+fi
+
+COPY=""
+COPY="$COPY compat/"
+COPY="$COPY include/"
+COPY="$COPY udev/"
+COPY="$COPY scripts/check_config.sh"
+COPY="$COPY scripts/check_depmod"
+COPY="$COPY scripts/compress_modules"
+COPY="$COPY scripts/gen-compat-autoconf.sh"
+COPY="$COPY scripts/modlib.sh"
+COPY="$COPY scripts/update-initramfs"
+COPY="$COPY scripts/skip-colors"
+COPY="$COPY .compat_base_tree"
+COPY="$COPY .compat_base_tree_version"
+COPY="$COPY .compat_version"
+COPY="$COPY config.mk"
+COPY="$COPY $EXTRA_COPY"
+
+REFRESH_LOCAL="scripts/refresh-compat-local"
+REFRESH_TARGET="refresh-compat"
+
+for i in $COPY ; do
+	if [[ -d ${COMPAT_SRC}${i} ]]; then
+		echo -e "Copying ${BLUE}${i}${NORMAL} ..."
+		cp -a ${COMPAT_SRC}/$i .
+		continue
+	fi
+	if [[ -f ${COMPAT_SRC}${i} ]]; then
+		DIR=$(dirname $i)
+		if [[ ! -d $DIR ]]; then
+			mkdir $DIR
+		fi
+
+		if [[ -x ${COMPAT_SRC}${i} ]]; then
+			echo -e "Copying ${GREEN}${i}${NORMAL} ..."
+		else
+			echo -e "Copying ${i}${NORMAL} ..."
+		fi
+
+		cp -f ${COMPAT_SRC}/${i} $i
+		continue
+	fi
+done
+
+rm -f include/linux/compat_autoconfig.h
+rm -f .config
+
+cp -f ${COMPAT_SRC}/${REFRESH_LOCAL} ${REFRESH_TARGET}
+
+if [[ ! -f .compat_base_tree_version ]]; then
+	echo -e "Failed at copying files over..."
+	exit 1
+fi
+
+echo
+echo -e "Synched with ${CYAN}$(cat .compat_version)${NORMAL}"

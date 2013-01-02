@@ -1,0 +1,12 @@
+compat-wireless as a whole aims to always be compiled and used with the
+oldest stable kernel supported by kernel.org. This will be the oldest
+stable kernel on the 2.6. series listed on the kernel.org front page.
+Sometimes we'll go even beyond that.
+
+Backporting compat-wireless involves backporting some subsystems but
+at times we may want to support compiling only certain drivers on older
+kernels since its easier to backport some subsystems. Such is the case
+with PCI drivers. This directly exists to allow developers enable
+compilation of compat-wireless on older drivers using ./scripts/driver-select
+Upon selection of a driver a patch from this directly will be applied to
+allow further compilation of one driver onto even older kernels.

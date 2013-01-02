@@ -1,0 +1,19 @@
+Old kernel versions do not support WQ_HIGHPRI and WQ_MEM_RECLAIM so we
+should use create_singlethread_workqueue() which was used at this
+position before.
+
+--- a/net/bluetooth/hci_core.c
++++ b/net/bluetooth/hci_core.c
+@@ -1740,8 +1740,12 @@ int hci_register_dev(struct hci_dev *hde
+ 
+ 	write_unlock(&hci_dev_list_lock);
+ 
++#if (LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,37))
+ 	hdev->workqueue = alloc_workqueue(hdev->name, WQ_HIGHPRI | WQ_UNBOUND |
+ 							WQ_MEM_RECLAIM, 1);
++#else
++	hdev->workqueue = create_singlethread_workqueue(hdev->name);
++#endif
+ 	if (!hdev->workqueue) {
+ 		error = -ENOMEM;
+ 		goto err;

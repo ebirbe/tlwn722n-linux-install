@@ -1,0 +1,58 @@
+
+This patch backports the namespace changes added
+through net/wireless/wext.c.
+
+--- a/net/wireless/wext-core.c
++++ b/net/wireless/wext-core.c
+@@ -342,6 +342,7 @@ static const int compat_event_type_size[
+ 
+ /* IW event code */
+ 
++#if (LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,32))
+ static int __net_init wext_pernet_init(struct net *net)
+ {
+ 	skb_queue_head_init(&net->wext_nlevents);
+@@ -384,6 +385,29 @@ static void wireless_nlevent_process(str
+ 
+ static DECLARE_WORK(wireless_nlevent_work, wireless_nlevent_process);
+ 
++#else
++/* Older kernels get the old way of doing stuff*/
++static struct sk_buff_head wireless_nlevent_queue;
++
++static int __init wireless_nlevent_init(void)
++{
++	skb_queue_head_init(&wireless_nlevent_queue);
++	return 0;
++}
++
++subsys_initcall(wireless_nlevent_init);
++
++static void wireless_nlevent_process(unsigned long data)
++{
++	struct sk_buff *skb;
++	while ((skb = skb_dequeue(&wireless_nlevent_queue)))
++		rtnl_notify(skb, &init_net, 0, RTNLGRP_LINK, NULL, GFP_ATOMIC);
++}
++
++static DECLARE_TASKLET(wireless_nlevent_tasklet, wireless_nlevent_process, 0);
++
++#endif
++
+ static struct nlmsghdr *rtnetlink_ifinfo_prep(struct net_device *dev,
+ 					      struct sk_buff *skb)
+ {
+@@ -597,8 +621,13 @@ void wireless_send_event(struct net_devi
+ 
+ 	skb_shinfo(skb)->frag_list = compskb;
+ #endif
++#if (LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,32))
+ 	skb_queue_tail(&dev_net(dev)->wext_nlevents, skb);
+ 	schedule_work(&wireless_nlevent_work);
++#else
++	skb_queue_tail(&wireless_nlevent_queue, skb);
++	tasklet_schedule(&wireless_nlevent_tasklet);
++#endif
+ }
+ EXPORT_SYMBOL(wireless_send_event);
+ 

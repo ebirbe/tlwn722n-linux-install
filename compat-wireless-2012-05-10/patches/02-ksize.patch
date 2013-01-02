@@ -1,0 +1,69 @@
+ksize() was added as of 2.6.29, it gives you the actual
+size of the allocated data. Since we have no support for
+this we simply do not optimize for it and deal with
+large alloocations for the IEs.
+
+We technically could backport this as
+
+define ksize(bleh) SOME_LARGE_NUMBER
+
+but doing it this way emphasis careful review
+of the situation.
+
+--- a/drivers/net/wireless/orinoco/wext.c
++++ b/drivers/net/wireless/orinoco/wext.c
+@@ -30,8 +30,22 @@ static int orinoco_set_key(struct orinoc
+ 			   enum orinoco_alg alg, const u8 *key, int key_len,
+ 			   const u8 *seq, int seq_len)
+ {
++#if LINUX_VERSION_CODE <= KERNEL_VERSION(2,6,28)
++	int len;
++	if (!unlikely(ZERO_OR_NULL_PTR(priv->keys[index].key))) {
++		len = priv->keys[index].key_len;
++		memset(priv->keys[index].key, 0, len);
++		kfree(priv->keys[index].key);
++	}
++	if (!unlikely(ZERO_OR_NULL_PTR(priv->keys[index].seq))) {
++		len = priv->keys[index].seq_len;
++		memset(priv->keys[index].seq, 0, len);
++		kfree(priv->keys[index].seq);
++	}
++#else
+ 	kzfree(priv->keys[index].key);
+ 	kzfree(priv->keys[index].seq);
++#endif
+ 
+ 	if (key_len) {
+ 		priv->keys[index].key = kzalloc(key_len, GFP_ATOMIC);
+--- a/net/wireless/scan.c
++++ b/net/wireless/scan.c
+@@ -637,9 +637,14 @@ cfg80211_bss_update(struct cfg80211_regi
+ 			size_t used = dev->wiphy.bss_priv_size + sizeof(*res);
+ 			size_t ielen = res->pub.len_proberesp_ies;
+ 
++#if LINUX_VERSION_CODE <= KERNEL_VERSION(2,6,28)
++			if (0) {
++				used = 0; /* just to shut up the compiler */
++#else
+ 			if (found->pub.proberesp_ies &&
+ 			    !found->proberesp_ies_allocated &&
+ 			    ksize(found) >= used + ielen) {
++#endif
+ 				memcpy(found->pub.proberesp_ies,
+ 				       res->pub.proberesp_ies, ielen);
+ 				found->pub.len_proberesp_ies = ielen;
+@@ -673,9 +678,14 @@ cfg80211_bss_update(struct cfg80211_regi
+ 				(found->pub.information_elements ==
+ 				 found->pub.beacon_ies);
+ 
++#if LINUX_VERSION_CODE <= KERNEL_VERSION(2,6,28)
++			if (0) {
++				used = 0; /* just to shut up the compiler */
++#else
+ 			if (found->pub.beacon_ies &&
+ 			    !found->beacon_ies_allocated &&
+ 			    ksize(found) >= used + ielen) {
++#endif
+ 				memcpy(found->pub.beacon_ies,
+ 				       res->pub.beacon_ies, ielen);
+ 				found->pub.len_beacon_ies = ielen;

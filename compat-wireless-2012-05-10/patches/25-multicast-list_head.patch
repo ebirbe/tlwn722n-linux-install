@@ -1,0 +1,820 @@
+Backport commit 22bedad3ce112d5ca1eaf043d4990fa2ed698c87:
+  net: convert multicast list to list_head
+
+  Converts the list and the core manipulating with it to be the same as uc_list.
+
+  +uses two functions for adding/removing mc address (normal and "global"
+   variant) instead of a function parameter.
+  +removes dev_mcast.c completely.
+  +exposes netdev_hw_addr_list_* macros along with __hw_addr_* functions for
+   manipulation with lists on a sandbox (used in bonding and 80211 drivers)
+
+This also backport commit 2f787b0b76bf5de2eaa3ca3a29d89123ae03c856
+
+--- a/drivers/net/ethernet/atheros/atl1c/atl1c_main.c
++++ b/drivers/net/ethernet/atheros/atl1c/atl1c_main.c
+@@ -411,7 +411,11 @@ static void atl1c_set_multi(struct net_d
+ 
+ 	/* comoute mc addresses' hash value ,and put it into hash table */
+ 	netdev_for_each_mc_addr(ha, netdev) {
++#if (LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,35))
+ 		hash_value = atl1c_hash_mc_addr(hw, ha->addr);
++#else
++		hash_value = atl1c_hash_mc_addr(hw, ha->dmi_addr);
++#endif
+ 		atl1c_hash_set(hw, hash_value);
+ 	}
+ }
+--- a/drivers/net/ethernet/atheros/atl1e/atl1e_main.c
++++ b/drivers/net/ethernet/atheros/atl1e/atl1e_main.c
+@@ -308,7 +308,11 @@ static void atl1e_set_multi(struct net_d
+ 
+ 	/* comoute mc addresses' hash value ,and put it into hash table */
+ 	netdev_for_each_mc_addr(ha, netdev) {
++#if (LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,35))
+ 		hash_value = atl1e_hash_mc_addr(hw, ha->addr);
++#else
++		hash_value = atl1e_hash_mc_addr(hw, ha->dmi_addr);
++#endif
+ 		atl1e_hash_set(hw, hash_value);
+ 	}
+ }
+--- a/drivers/net/ethernet/atheros/atlx/atl2.c
++++ b/drivers/net/ethernet/atheros/atlx/atl2.c
+@@ -159,7 +159,11 @@ static void atl2_set_multi(struct net_de
+ 
+ 	/* comoute mc addresses' hash value ,and put it into hash table */
+ 	netdev_for_each_mc_addr(ha, netdev) {
++#if (LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,35))
+ 		hash_value = atl2_hash_mc_addr(hw, ha->addr);
++#else
++		hash_value = atl2_hash_mc_addr(hw, ha->dmi_addr);
++#endif
+ 		atl2_hash_set(hw, hash_value);
+ 	}
+ }
+--- a/drivers/net/ethernet/atheros/atlx/atlx.c
++++ b/drivers/net/ethernet/atheros/atlx/atlx.c
+@@ -150,7 +150,11 @@ static void atlx_set_multi(struct net_de
+ 
+ 	/* compute mc addresses' hash value ,and put it into hash table */
+ 	netdev_for_each_mc_addr(ha, netdev) {
++#if (LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,35))
+ 		hash_value = atlx_hash_mc_addr(hw, ha->addr);
++#else
++		hash_value = atlx_hash_mc_addr(hw, ha->dmi_addr);
++#endif
+ 		atlx_hash_set(hw, hash_value);
+ 	}
+ }
+--- a/drivers/net/ethernet/broadcom/b44.c
++++ b/drivers/net/ethernet/broadcom/b44.c
+@@ -1687,7 +1687,11 @@ static int __b44_load_mcast(struct b44 *
+ 	netdev_for_each_mc_addr(ha, dev) {
+ 		if (i == num_ents)
+ 			break;
++#if (LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,35))
+ 		__b44_cam_write(bp, ha->addr, i++ + 1);
++#else
++		__b44_cam_write(bp, ha->dmi_addr, i++ + 1);
++#endif
+ 	}
+ 	return i+1;
+ }
+--- a/drivers/net/wireless/adm8211.c
++++ b/drivers/net/wireless/adm8211.c
+@@ -1320,19 +1320,37 @@ static void adm8211_bss_info_changed(str
+ }
+ 
+ static u64 adm8211_prepare_multicast(struct ieee80211_hw *hw,
++#if (LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,35))
+ 				     struct netdev_hw_addr_list *mc_list)
++#else
++				     int mc_count, struct dev_addr_list *ha)
++#endif
+ {
++#if (LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,35))
+ 	unsigned int bit_nr;
+-	u32 mc_filter[2];
+ 	struct netdev_hw_addr *ha;
++#else
++	unsigned int bit_nr, i;
++#endif
++	u32 mc_filter[2];
+ 
+ 	mc_filter[1] = mc_filter[0] = 0;
+ 
++#if (LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,35))
+ 	netdev_hw_addr_list_for_each(ha, mc_list) {
+ 		bit_nr = ether_crc(ETH_ALEN, ha->addr) >> 26;
++#else
++	for (i = 0; i < mc_count; i++) {
++		if (!ha)
++			break;
++		bit_nr = ether_crc(ETH_ALEN, ha->dmi_addr) >> 26;
++#endif
+ 
+ 		bit_nr &= 0x3F;
+ 		mc_filter[bit_nr >> 5] |= 1 << (bit_nr & 31);
++#if (LINUX_VERSION_CODE < KERNEL_VERSION(2,6,35))
++		ha = ha->next;
++#endif
+ 	}
+ 
+ 	return mc_filter[0] | ((u64)(mc_filter[1]) << 32);
+--- a/drivers/net/wireless/ath/ath5k/mac80211-ops.c
++++ b/drivers/net/wireless/ath/ath5k/mac80211-ops.c
+@@ -318,20 +318,42 @@ ath5k_bss_info_changed(struct ieee80211_
+ 
+ static u64
+ ath5k_prepare_multicast(struct ieee80211_hw *hw,
++#if (LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,35))
+ 			struct netdev_hw_addr_list *mc_list)
++#else
++			int mc_count, struct dev_addr_list *ha)
++#endif
+ {
+ 	u32 mfilt[2], val;
+ 	u8 pos;
++#if (LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,35))
+ 	struct netdev_hw_addr *ha;
++#else
++	int i;
++#endif
+ 
+ 	mfilt[0] = 0;
+ 	mfilt[1] = 1;
+ 
++#if (LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,35))
+ 	netdev_hw_addr_list_for_each(ha, mc_list) {
++#else
++	for (i = 0; i < mc_count; i++) {
++		if (!ha)
++			break;
++#endif
+ 		/* calculate XOR of eight 6-bit values */
++#if (LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,35))
+ 		val = get_unaligned_le32(ha->addr + 0);
++#else
++		val = get_unaligned_le32(ha->dmi_addr + 0);
++#endif
+ 		pos = (val >> 18) ^ (val >> 12) ^ (val >> 6) ^ val;
++#if (LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,35))
+ 		val = get_unaligned_le32(ha->addr + 3);
++#else
++		val = get_unaligned_le32(ha->dmi_addr + 3);
++#endif
+ 		pos ^= (val >> 18) ^ (val >> 12) ^ (val >> 6) ^ val;
+ 		pos &= 0x3f;
+ 		mfilt[pos / 32] |= (1 << (pos % 32));
+@@ -340,6 +362,9 @@ ath5k_prepare_multicast(struct ieee80211
+ 		* need to inform below not to reset the mcast */
+ 		/* ath5k_hw_set_mcast_filterindex(ah,
+ 		 *      ha->addr[5]); */
++#if (LINUX_VERSION_CODE < KERNEL_VERSION(2,6,35))
++		ha = ha->next;
++#endif
+ 	}
+ 
+ 	return ((u64)(mfilt[1]) << 32) | mfilt[0];
+--- a/drivers/net/wireless/ath/carl9170/main.c
++++ b/drivers/net/wireless/ath/carl9170/main.c
+@@ -897,17 +897,35 @@ out:
+ 	return err;
+ }
+ 
++#if (LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,35))
+ static u64 carl9170_op_prepare_multicast(struct ieee80211_hw *hw,
+ 					 struct netdev_hw_addr_list *mc_list)
++#else
++static u64 carl9170_op_prepare_multicast(struct ieee80211_hw *hw, int mc_count,
++					 struct dev_addr_list *ha)
++#endif
+ {
++#if (LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,35))
+ 	struct netdev_hw_addr *ha;
++#else
++	int i;
++#endif
+ 	u64 mchash;
+ 
+ 	/* always get broadcast frames */
+ 	mchash = 1ULL << (0xff >> 2);
+ 
++#if (LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,35))
+ 	netdev_hw_addr_list_for_each(ha, mc_list)
+ 		mchash |= 1ULL << (ha->addr[5] >> 2);
++#else
++	for (i = 0; i < mc_count; i++) {
++		if (WARN_ON(!ha))
++			break;
++		mchash |= 1ULL << (ha->dmi_addr[5] >> 2);
++		ha = ha->next;
++	}
++#endif
+ 
+ 	return mchash;
+ }
+--- a/drivers/net/wireless/libertas/main.c
++++ b/drivers/net/wireless/libertas/main.c
+@@ -343,18 +343,34 @@ static int lbs_add_mcast_addrs(struct cm
+ 	netif_addr_lock_bh(dev);
+ 	cnt = netdev_mc_count(dev);
+ 	netdev_for_each_mc_addr(ha, dev) {
++#if (LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,35))
+ 		if (mac_in_list(cmd->maclist, nr_addrs, ha->addr)) {
++#else
++		if (mac_in_list(cmd->maclist, nr_addrs, ha->dmi_addr)) {
++#endif
+ 			lbs_deb_net("mcast address %s:%pM skipped\n", dev->name,
++#if (LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,35))
+ 				    ha->addr);
++#else
++				    ha->dmi_addr);
++#endif
+ 			cnt--;
+ 			continue;
+ 		}
+ 
+ 		if (i == MRVDRV_MAX_MULTICAST_LIST_SIZE)
+ 			break;
++#if (LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,35))
+ 		memcpy(&cmd->maclist[6*i], ha->addr, ETH_ALEN);
++#else
++		memcpy(&cmd->maclist[6*i], ha->dmi_addr, ETH_ALEN);
++#endif
+ 		lbs_deb_net("mcast address %s:%pM added to filter\n", dev->name,
++#if (LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,35))
+ 			    ha->addr);
++#else
++			    ha->dmi_addr);
++#endif
+ 		i++;
+ 		cnt--;
+ 	}
+--- a/drivers/net/wireless/libertas_tf/main.c
++++ b/drivers/net/wireless/libertas_tf/main.c
+@@ -419,20 +419,36 @@ static int lbtf_op_config(struct ieee802
+ }
+ 
+ static u64 lbtf_op_prepare_multicast(struct ieee80211_hw *hw,
++#if (LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,35))
+ 				     struct netdev_hw_addr_list *mc_list)
++#else
++				     int mc_count, struct dev_addr_list *ha)
++#endif
+ {
+ 	struct lbtf_private *priv = hw->priv;
+ 	int i;
++#if (LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,35))
+ 	struct netdev_hw_addr *ha;
+ 	int mc_count = netdev_hw_addr_list_count(mc_list);
++#endif
+ 
+ 	if (!mc_count || mc_count > MRVDRV_MAX_MULTICAST_LIST_SIZE)
+ 		return mc_count;
+ 
+ 	priv->nr_of_multicastmacaddr = mc_count;
++#if (LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,35))
+ 	i = 0;
+ 	netdev_hw_addr_list_for_each(ha, mc_list)
+ 		memcpy(&priv->multicastlist[i++], ha->addr, ETH_ALEN);
++#else
++	for (i = 0; i < mc_count; i++) {
++		if (!ha)
++			break;
++		memcpy(&priv->multicastlist[i], ha->da_addr,
++				ETH_ALEN);
++		ha = ha->next;
++	}
++#endif
+ 
+ 	return mc_count;
+ }
+--- a/drivers/net/wireless/mwifiex/sta_ioctl.c
++++ b/drivers/net/wireless/mwifiex/sta_ioctl.c
+@@ -40,7 +40,11 @@ int mwifiex_copy_mcast_addr(struct mwifi
+ 	struct netdev_hw_addr *ha;
+ 
+ 	netdev_for_each_mc_addr(ha, dev)
++#if (LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,35))
+ 		memcpy(&mlist->mac_list[i++], ha->addr, ETH_ALEN);
++#else
++		memcpy(&mlist->mac_list[i++], ha->dmi_addr, ETH_ALEN);
++#endif
+ 
+ 	return i;
+ }
+--- a/drivers/net/wireless/mwifiex/debugfs.c
++++ b/drivers/net/wireless/mwifiex/debugfs.c
+@@ -216,7 +216,11 @@ mwifiex_info_read(struct file *file, cha
+ 
+ 		netdev_for_each_mc_addr(ha, netdev)
+ 			p += sprintf(p, "multicast_address[%d]=\"%pM\"\n",
++#if (LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,35))
+ 					i++, ha->addr);
++#else
++					i++, ha->dmi_addr);
++#endif
+ 	}
+ 
+ 	p += sprintf(p, "num_tx_bytes = %lu\n", priv->stats.tx_bytes);
+--- a/drivers/net/wireless/mwl8k.c
++++ b/drivers/net/wireless/mwl8k.c
+@@ -2563,15 +2563,21 @@ struct mwl8k_cmd_mac_multicast_adr {
+ 
+ static struct mwl8k_cmd_pkt *
+ __mwl8k_cmd_mac_multicast_adr(struct ieee80211_hw *hw, int allmulti,
++#if (LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,35))
+ 			      struct netdev_hw_addr_list *mc_list)
++#else
++			      int mc_count, struct dev_addr_list *ha)
++#endif
+ {
+ 	struct mwl8k_priv *priv = hw->priv;
+ 	struct mwl8k_cmd_mac_multicast_adr *cmd;
+ 	int size;
++#if (LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,35))
+ 	int mc_count = 0;
+ 
+ 	if (mc_list)
+ 		mc_count = netdev_hw_addr_list_count(mc_list);
++#endif
+ 
+ 	if (allmulti || mc_count > priv->num_mcaddrs) {
+ 		allmulti = 1;
+@@ -2592,13 +2598,27 @@ __mwl8k_cmd_mac_multicast_adr(struct iee
+ 	if (allmulti) {
+ 		cmd->action |= cpu_to_le16(MWL8K_ENABLE_RX_ALL_MULTICAST);
+ 	} else if (mc_count) {
++#if (LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,35))
+ 		struct netdev_hw_addr *ha;
+ 		int i = 0;
++#else
++		int i;
++#endif
+ 
+ 		cmd->action |= cpu_to_le16(MWL8K_ENABLE_RX_MULTICAST);
+ 		cmd->numaddr = cpu_to_le16(mc_count);
++#if (LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,35))
+ 		netdev_hw_addr_list_for_each(ha, mc_list) {
+ 			memcpy(cmd->addr[i], ha->addr, ETH_ALEN);
++#else
++		for (i = 0; i < mc_count && ha; i++) {
++			if (ha->da_addrlen != ETH_ALEN) {
++				kfree(cmd);
++				return NULL;
++			}
++			memcpy(cmd->addr[i], ha->da_addr, ETH_ALEN);
++			ha = ha->next;
++#endif
+ 		}
+ 	}
+ 
+@@ -4822,7 +4842,11 @@ mwl8k_bss_info_changed(struct ieee80211_
+ }
+ 
+ static u64 mwl8k_prepare_multicast(struct ieee80211_hw *hw,
++#if (LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,35))
+ 				   struct netdev_hw_addr_list *mc_list)
++#else
++				   int mc_count, struct dev_addr_list *ha)
++#endif
+ {
+ 	struct mwl8k_cmd_pkt *cmd;
+ 
+@@ -4833,7 +4857,11 @@ static u64 mwl8k_prepare_multicast(struc
+ 	 * we'll end up throwing this packet away and creating a new
+ 	 * one in mwl8k_configure_filter().
+ 	 */
++#if (LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,35))
+ 	cmd = __mwl8k_cmd_mac_multicast_adr(hw, 0, mc_list);
++#else
++	cmd = __mwl8k_cmd_mac_multicast_adr(hw, 0, mc_count, ha);
++#endif
+ 
+ 	return (unsigned long)cmd;
+ }
+@@ -4955,7 +4983,11 @@ static void mwl8k_configure_filter(struc
+ 	 */
+ 	if (*total_flags & FIF_ALLMULTI) {
+ 		kfree(cmd);
++#if (LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,35))
+ 		cmd = __mwl8k_cmd_mac_multicast_adr(hw, 1, NULL);
++#else
++		cmd = __mwl8k_cmd_mac_multicast_adr(hw, 1, 0, NULL);
++#endif
+ 	}
+ 
+ 	if (cmd != NULL) {
+--- a/drivers/net/wireless/orinoco/hw.c
++++ b/drivers/net/wireless/orinoco/hw.c
+@@ -1093,7 +1093,11 @@ int __orinoco_hw_set_multicast_list(stru
+ 		netdev_for_each_mc_addr(ha, dev) {
+ 			if (i == mc_count)
+ 				break;
++#if (LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,35))
+ 			memcpy(mclist.addr[i++], ha->addr, ETH_ALEN);
++#else
++			memcpy(mclist.addr[i++], ha->dmi_addr, ETH_ALEN);
++#endif
+ 		}
+ 
+ 		err = hw->ops->write_ltv(hw, USER_BAP,
+--- a/drivers/net/wireless/orinoco/hw.h
++++ b/drivers/net/wireless/orinoco/hw.h
+@@ -22,6 +22,9 @@
+ 
+ /* Forward declarations */
+ struct orinoco_private;
++#if (LINUX_VERSION_CODE < KERNEL_VERSION(2,6,35))
++struct dev_addr_list;
++#endif
+ 
+ int determine_fw_capabilities(struct orinoco_private *priv, char *fw_name,
+ 			      size_t fw_name_len, u32 *hw_ver);
+--- a/drivers/net/wireless/p54/main.c
++++ b/drivers/net/wireless/p54/main.c
+@@ -363,11 +363,18 @@ out:
+ 	return ret;
+ }
+ 
++#if (LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,35))
+ static u64 p54_prepare_multicast(struct ieee80211_hw *dev,
+ 				 struct netdev_hw_addr_list *mc_list)
++#else
++static u64 p54_prepare_multicast(struct ieee80211_hw *dev, int mc_count,
++				 struct dev_addr_list *ha)
++#endif
+ {
+ 	struct p54_common *priv = dev->priv;
++#if (LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,35))
+ 	struct netdev_hw_addr *ha;
++#endif
+ 	int i;
+ 
+ 	BUILD_BUG_ON(ARRAY_SIZE(priv->mc_maclist) !=
+@@ -377,12 +384,23 @@ static u64 p54_prepare_multicast(struct
+ 	 * Otherwise the firmware will drop it and ARP will no longer work.
+ 	 */
+ 	i = 1;
++#if (LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,35))
+ 	priv->mc_maclist_num = netdev_hw_addr_list_count(mc_list) + i;
+ 	netdev_hw_addr_list_for_each(ha, mc_list) {
+ 		memcpy(&priv->mc_maclist[i], ha->addr, ETH_ALEN);
++#else
++	priv->mc_maclist_num = mc_count + i;
++	while (i <= mc_count) {
++		if (!ha)
++			break;
++		memcpy(&priv->mc_maclist[i], ha->dmi_addr, ETH_ALEN);
++#endif
+ 		i++;
+ 		if (i >= ARRAY_SIZE(priv->mc_maclist))
+ 			break;
++#if (LINUX_VERSION_CODE < KERNEL_VERSION(2,6,35))
++		ha = ha->next;
++#endif
+ 	}
+ 
+ 	return 1; /* update */
+--- a/drivers/net/wireless/rndis_wlan.c
++++ b/drivers/net/wireless/rndis_wlan.c
+@@ -1661,7 +1661,11 @@ static void set_multicast_list(struct us
+ 
+ 		netdev_for_each_mc_addr(ha, usbdev->net)
+ 			memcpy(mc_addrs + i++ * ETH_ALEN,
++#if (LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,35))
+ 			       ha->addr, ETH_ALEN);
++#else
++			       ha->dmi_addr, ETH_ALEN);
++#endif
+ 	}
+ 	netif_addr_unlock_bh(usbdev->net);
+ 
+--- a/drivers/net/wireless/rtl818x/rtl8180/dev.c
++++ b/drivers/net/wireless/rtl818x/rtl8180/dev.c
+@@ -814,10 +814,19 @@ static void rtl8180_bss_info_changed(str
+ 	}
+ }
+ 
++#if (LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,35))
+ static u64 rtl8180_prepare_multicast(struct ieee80211_hw *dev,
+ 				     struct netdev_hw_addr_list *mc_list)
++#else
++static u64 rtl8180_prepare_multicast(struct ieee80211_hw *dev, int mc_count,
++				     struct dev_addr_list *mc_list)
++#endif
+ {
++#if (LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,35))
+ 	return netdev_hw_addr_list_count(mc_list);
++#else
++	return mc_count;
++#endif
+ }
+ 
+ static void rtl8180_configure_filter(struct ieee80211_hw *dev,
+--- a/drivers/net/wireless/rtl818x/rtl8187/dev.c
++++ b/drivers/net/wireless/rtl818x/rtl8187/dev.c
+@@ -1288,9 +1288,17 @@ static void rtl8187_bss_info_changed(str
+ }
+ 
+ static u64 rtl8187_prepare_multicast(struct ieee80211_hw *dev,
++#if (LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,35))
+ 				     struct netdev_hw_addr_list *mc_list)
++#else
++				     int mc_count, struct dev_addr_list *mc_list)
++#endif
+ {
++#if (LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,35))
+ 	return netdev_hw_addr_list_count(mc_list);
++#else
++	return mc_count;
++#endif
+ }
+ 
+ static void rtl8187_configure_filter(struct ieee80211_hw *dev,
+--- a/drivers/net/wireless/ti/wlcore/main.c
++++ b/drivers/net/wireless/ti/wlcore/main.c
+@@ -2358,11 +2358,20 @@ struct wl1271_filter_params {
+ 	u8 mc_list[ACX_MC_ADDRESS_GROUP_MAX][ETH_ALEN];
+ };
+ 
++#if (LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,35))
+ static u64 wl1271_op_prepare_multicast(struct ieee80211_hw *hw,
+ 				       struct netdev_hw_addr_list *mc_list)
++#else
++static u64 wl1271_op_prepare_multicast(struct ieee80211_hw *hw, int mc_count,
++				       struct dev_addr_list *mc_list)
++#endif
+ {
+ 	struct wl1271_filter_params *fp;
++#if (LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,35))
+ 	struct netdev_hw_addr *ha;
++#else
++	int i;
++#endif
+ 	struct wl1271 *wl = hw->priv;
+ 
+ 	if (unlikely(wl->state == WL1271_STATE_OFF))
+@@ -2375,16 +2384,40 @@ static u64 wl1271_op_prepare_multicast(s
+ 	}
+ 
+ 	/* update multicast filtering parameters */
++#if (LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,35))
+ 	fp->mc_list_length = 0;
+ 	if (netdev_hw_addr_list_count(mc_list) > ACX_MC_ADDRESS_GROUP_MAX) {
++#else
++	fp->enabled = true;
++	if (mc_count > ACX_MC_ADDRESS_GROUP_MAX) {
++		mc_count = 0;
++#endif
+ 		fp->enabled = false;
++#if (LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,35))
+ 	} else {
+ 		fp->enabled = true;
+ 		netdev_hw_addr_list_for_each(ha, mc_list) {
++#else
++	}
++
++	fp->mc_list_length = 0;
++	for (i = 0; i < mc_count; i++) {
++		if (mc_list->da_addrlen == ETH_ALEN) {
++#endif
+ 			memcpy(fp->mc_list[fp->mc_list_length],
++#if (LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,35))
+ 					ha->addr, ETH_ALEN);
++#else
++			       mc_list->da_addr, ETH_ALEN);
++#endif
+ 			fp->mc_list_length++;
++#if (LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,35))
+ 		}
++#else
++		} else
++			wl1271_warning("Unknown mc address length.");
++		mc_list = mc_list->next;
++#endif
+ 	}
+ 
+ 	return (u64)(unsigned long)fp;
+--- a/drivers/net/wireless/zd1211rw/zd_mac.c
++++ b/drivers/net/wireless/zd1211rw/zd_mac.c
+@@ -1213,17 +1213,34 @@ static void zd_process_intr(struct work_
+ 
+ 
+ static u64 zd_op_prepare_multicast(struct ieee80211_hw *hw,
++#if (LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,35))
+ 				   struct netdev_hw_addr_list *mc_list)
++#else
++				   int mc_count, struct dev_addr_list *ha)
++#endif
+ {
+ 	struct zd_mac *mac = zd_hw_mac(hw);
+ 	struct zd_mc_hash hash;
++#if (LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,35))
+ 	struct netdev_hw_addr *ha;
++#else
++	int i;
++#endif
+ 
+ 	zd_mc_clear(&hash);
+ 
++#if (LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,35))
+ 	netdev_hw_addr_list_for_each(ha, mc_list) {
+ 		dev_dbg_f(zd_mac_dev(mac), "mc addr %pM\n", ha->addr);
+ 		zd_mc_add_addr(&hash, ha->addr);
++#else
++	for (i = 0; i < mc_count; i++) {
++		if (!ha)
++			break;
++		dev_dbg_f(zd_mac_dev(mac), "mc addr %pM\n", ha->dmi_addr);
++		zd_mc_add_addr(&hash, ha->dmi_addr);
++		ha = ha->next;
++#endif
+ 	}
+ 
+ 	return hash.low | ((u64)hash.high << 32);
+--- a/drivers/net/wireless/brcm80211/brcmfmac/dhd_linux.c
++++ b/drivers/net/wireless/brcm80211/brcmfmac/dhd_linux.c
+@@ -142,7 +142,11 @@ static void _brcmf_set_multicast_list(st
+ 	netdev_for_each_mc_addr(ha, ndev) {
+ 		if (!cnt)
+ 			break;
++#if (LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,35))
+ 		memcpy(bufp, ha->addr, ETH_ALEN);
++#else
++		memcpy(bufp, ha->dmi_addr, ETH_ALEN);
++#endif
+ 		bufp += ETH_ALEN;
+ 		cnt--;
+ 	}
+--- a/include/net/mac80211.h
++++ b/include/net/mac80211.h
+@@ -2257,7 +2257,11 @@ struct ieee80211_ops {
+ 				 u32 changed);
+ 
+ 	u64 (*prepare_multicast)(struct ieee80211_hw *hw,
++#if (LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,35))
+ 				 struct netdev_hw_addr_list *mc_list);
++#else
++				 int mc_count, struct dev_addr_list *mc_list);
++#endif
+ 	void (*configure_filter)(struct ieee80211_hw *hw,
+ 				 unsigned int changed_flags,
+ 				 unsigned int *total_flags,
+--- a/net/bluetooth/bnep/netdev.c
++++ b/net/bluetooth/bnep/netdev.c
+@@ -102,8 +102,13 @@ static void bnep_net_set_mc_list(struct
+ 		netdev_for_each_mc_addr(ha, dev) {
+ 			if (i == BNEP_MAX_MULTICAST_FILTERS)
+ 				break;
++#if (LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,35))
+ 			memcpy(__skb_put(skb, ETH_ALEN), ha->addr, ETH_ALEN);
+ 			memcpy(__skb_put(skb, ETH_ALEN), ha->addr, ETH_ALEN);
++#else
++			memcpy(__skb_put(skb, ETH_ALEN), ha->dmi_addr, ETH_ALEN);
++			memcpy(__skb_put(skb, ETH_ALEN), ha->dmi_addr, ETH_ALEN);
++#endif
+ 
+ 			i++;
+ 		}
+--- a/net/mac80211/driver-ops.h
++++ b/net/mac80211/driver-ops.h
+@@ -222,14 +222,28 @@ static inline void drv_bss_info_changed(
+ }
+ 
+ static inline u64 drv_prepare_multicast(struct ieee80211_local *local,
++#if (LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,35))
+ 					struct netdev_hw_addr_list *mc_list)
++#else
++					int mc_count,
++					struct dev_addr_list *mc_list)
++#endif
+ {
+ 	u64 ret = 0;
+ 
++#if (LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,35))
+ 	trace_drv_prepare_multicast(local, mc_list->count);
++#else
++	trace_drv_prepare_multicast(local, mc_count);
++#endif
+ 
+ 	if (local->ops->prepare_multicast)
++#if (LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,35))
+ 		ret = local->ops->prepare_multicast(&local->hw, mc_list);
++#else
++		ret = local->ops->prepare_multicast(&local->hw, mc_count,
++						    mc_list);
++#endif
+ 
+ 	trace_drv_return_u64(local, ret);
+ 
+--- a/net/mac80211/ieee80211_i.h
++++ b/net/mac80211/ieee80211_i.h
+@@ -883,7 +883,12 @@ struct ieee80211_local {
+ 	struct work_struct recalc_smps;
+ 
+ 	/* aggregated multicast list */
++#if (LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,35))
+ 	struct netdev_hw_addr_list mc_list;
++#else
++	struct dev_addr_list *mc_list;
++	int mc_count;
++#endif
+ 
+ 	bool tim_in_locked_section; /* see ieee80211_beacon_get() */
+ 
+--- a/net/mac80211/iface.c
++++ b/net/mac80211/iface.c
+@@ -568,8 +568,13 @@ static void ieee80211_do_stop(struct iee
+ 
+ 	netif_addr_lock_bh(sdata->dev);
+ 	spin_lock_bh(&local->filter_lock);
++#if (LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,35))
+ 	__hw_addr_unsync(&local->mc_list, &sdata->dev->mc,
+ 			 sdata->dev->addr_len);
++#else
++	__dev_addr_unsync(&local->mc_list, &local->mc_count,
++			  &sdata->dev->mc_list, &sdata->dev->mc_count);
++#endif
+ 	spin_unlock_bh(&local->filter_lock);
+ 	netif_addr_unlock_bh(sdata->dev);
+ 
+@@ -743,7 +748,12 @@ static void ieee80211_set_multicast_list
+ 		sdata->flags ^= IEEE80211_SDATA_PROMISC;
+ 	}
+ 	spin_lock_bh(&local->filter_lock);
++#if (LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,35))
+ 	__hw_addr_sync(&local->mc_list, &dev->mc, dev->addr_len);
++#else
++	__dev_addr_sync(&local->mc_list, &local->mc_count,
++			&dev->mc_list, &dev->mc_count);
++#endif
+ 	spin_unlock_bh(&local->filter_lock);
+ 	ieee80211_queue_work(&local->hw, &local->reconfig_filter);
+ }
+--- a/net/mac80211/main.c
++++ b/net/mac80211/main.c
+@@ -72,7 +72,11 @@ void ieee80211_configure_filter(struct i
+ 	spin_lock_bh(&local->filter_lock);
+ 	changed_flags = local->filter_flags ^ new_flags;
+ 
++#if (LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,35))
+ 	mc = drv_prepare_multicast(local, &local->mc_list);
++#else
++	mc = drv_prepare_multicast(local, local->mc_count, local->mc_list);
++#endif
+ 	spin_unlock_bh(&local->filter_lock);
+ 
+ 	/* be a bit nasty */
+@@ -600,9 +604,11 @@ struct ieee80211_hw *ieee80211_alloc_hw(
+ 	wiphy->ht_capa_mod_mask = &mac80211_ht_capa_mod_mask;
+ 
+ 	INIT_LIST_HEAD(&local->interfaces);
++#if (LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,35))
+ 
+ 	__hw_addr_init(&local->mc_list);
+ 
++#endif
+ 	mutex_init(&local->iflist_mtx);
+ 	mutex_init(&local->mtx);
+ 
+--- a/drivers/net/wireless/ath/ath6kl/main.c
++++ b/drivers/net/wireless/ath/ath6kl/main.c
+@@ -1123,7 +1123,11 @@ static void ath6kl_set_multicast_list(st
+ 	list_for_each_entry_safe(mc_filter, tmp, &vif->mc_filter, list) {
+ 		found = false;
+ 		netdev_for_each_mc_addr(ha, ndev) {
++#if (LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,35))
+ 			if (memcmp(ha->addr, mc_filter->hw_addr,
++#else
++			if (memcmp(ha->dmi_addr, mc_filter->hw_addr,
++#endif
+ 				   ATH6KL_MCAST_FILTER_MAC_ADDR_SIZE) == 0) {
+ 				found = true;
+ 				break;
+@@ -1157,7 +1161,11 @@ static void ath6kl_set_multicast_list(st
+ 	netdev_for_each_mc_addr(ha, ndev) {
+ 		found = false;
+ 		list_for_each_entry(mc_filter, &vif->mc_filter, list) {
++#if (LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,35))
+ 			if (memcmp(ha->addr, mc_filter->hw_addr,
++#else
++			if (memcmp(ha->dmi_addr, mc_filter->hw_addr,
++#endif
+ 				   ATH6KL_MCAST_FILTER_MAC_ADDR_SIZE) == 0) {
+ 				found = true;
+ 				break;
+@@ -1172,7 +1180,11 @@ static void ath6kl_set_multicast_list(st
+ 				goto out;
+ 			}
+ 
++#if (LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,35))
+ 			memcpy(mc_filter->hw_addr, ha->addr,
++#else
++			memcpy(mc_filter->hw_addr, ha->dmi_addr,
++#endif
+ 			       ATH6KL_MCAST_FILTER_MAC_ADDR_SIZE);
+ 			/* Set the multicast filter */
+ 			ath6kl_dbg(ATH6KL_DBG_TRC,

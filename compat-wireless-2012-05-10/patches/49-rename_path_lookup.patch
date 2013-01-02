@@ -1,0 +1,14 @@
+path_lookup in net/mac80211/mesh_pathtbl.c consolidates with 
+path_lookup in include/linux/namei.h used in old kernel versions.
+
+--- a/net/mac80211/mesh_pathtbl.c
++++ b/net/mac80211/mesh_pathtbl.c
+@@ -18,6 +18,8 @@
+ #include "ieee80211_i.h"
+ #include "mesh.h"
+ 
++#define path_lookup general_path_lookup
++
+ #ifdef CONFIG_MAC80211_VERBOSE_MPATH_DEBUG
+ #define mpath_dbg(fmt, args...)	printk(KERN_DEBUG fmt, ##args)
+ #else

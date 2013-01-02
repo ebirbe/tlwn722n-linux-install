@@ -1,0 +1,53 @@
+You cannot backport assignment of netdev->addr_assign_type
+given that its part of the netdev data structure only in future
+kernels.
+
+mcgrof@tux ~/linux-next (git::master)$ git describe --contains c1f79426
+v2.6.36-rc1~571^2~104
+
+--- a/drivers/net/ethernet/atheros/atl1c/atl1c_main.c
++++ b/drivers/net/ethernet/atheros/atl1c/atl1c_main.c
+@@ -477,7 +477,9 @@ static int atl1c_set_mac_addr(struct net
+ 
+ 	memcpy(netdev->dev_addr, addr->sa_data, netdev->addr_len);
+ 	memcpy(adapter->hw.mac_addr, addr->sa_data, netdev->addr_len);
++#if (LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,36))
+ 	netdev->addr_assign_type &= ~NET_ADDR_RANDOM;
++#endif
+ 
+ 	atl1c_hw_set_mac_addr(&adapter->hw, adapter->hw.mac_addr);
+ 
+@@ -2571,7 +2573,9 @@ static int __devinit atl1c_probe(struct
+ 	}
+ 	if (atl1c_read_mac_addr(&adapter->hw)) {
+ 		/* got a random MAC address, set NET_ADDR_RANDOM to netdev */
++#if (LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,36))
+ 		netdev->addr_assign_type |= NET_ADDR_RANDOM;
++#endif
+ 	}
+ 	memcpy(netdev->dev_addr, adapter->hw.mac_addr, netdev->addr_len);
+ 	memcpy(netdev->perm_addr, adapter->hw.mac_addr, netdev->addr_len);
+--- a/drivers/net/ethernet/atheros/atlx/atlx.c
++++ b/drivers/net/ethernet/atheros/atlx/atlx.c
+@@ -84,7 +84,9 @@ static int atlx_set_mac(struct net_devic
+ 
+ 	memcpy(netdev->dev_addr, addr->sa_data, netdev->addr_len);
+ 	memcpy(adapter->hw.mac_addr, addr->sa_data, netdev->addr_len);
++#if (LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,36))
+ 	netdev->addr_assign_type &= ~NET_ADDR_RANDOM;
++#endif
+ 
+ 	atlx_set_mac_addr(&adapter->hw);
+ 	return 0;
+--- a/drivers/net/ethernet/atheros/atlx/atl1.c
++++ b/drivers/net/ethernet/atheros/atlx/atl1.c
+@@ -3068,7 +3068,9 @@ static int __devinit atl1_probe(struct p
+ 	/* copy the MAC address out of the EEPROM */
+ 	if (atl1_read_mac_addr(&adapter->hw)) {
+ 		/* mark random mac */
++#if (LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,36))
+ 		netdev->addr_assign_type |= NET_ADDR_RANDOM;
++#endif
+ 	}
+ 	memcpy(netdev->dev_addr, adapter->hw.mac_addr, netdev->addr_len);
+ 

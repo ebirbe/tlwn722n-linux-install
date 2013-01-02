@@ -1,0 +1,77 @@
+
+Every kernel release there are a few changes to headers
+made. Some code gets shifted around between headers or
+new headers are defined. This patch deals with such
+cases.
+
+--- a/drivers/net/wireless/ath/ath6kl/htc_pipe.c
++++ b/drivers/net/wireless/ath/ath6kl/htc_pipe.c
+@@ -18,6 +18,10 @@
+ #include "debug.h"
+ #include "hif-ops.h"
+ 
++#if (LINUX_VERSION_CODE < KERNEL_VERSION(2,6,29))
++#include <asm/unaligned.h>
++#endif
++
+ #define HTC_PACKET_CONTAINER_ALLOCATION 32
+ #define HTC_CONTROL_BUFFER_SIZE (HTC_MAX_CTRL_MSG_LEN + HTC_HDR_LENGTH)
+ 
+--- a/drivers/net/wireless/b43/phy_common.h
++++ b/drivers/net/wireless/b43/phy_common.h
+@@ -3,6 +3,9 @@
+ 
+ #include <linux/types.h>
+ #include <linux/nl80211.h>
++#if (LINUX_VERSION_CODE == KERNEL_VERSION(2,6,28))
++#include <asm/atomic.h>
++#endif
+ 
+ struct b43_wldev;
+ 
+--- a/drivers/net/wireless/rtlwifi/base.c
++++ b/drivers/net/wireless/rtlwifi/base.c
+@@ -36,6 +36,7 @@
+ #include "regd.h"
+ 
+ #include <linux/ip.h>
++#include <linux/in.h>
+ #include <linux/module.h>
+ 
+ /*
+--- a/drivers/net/wireless/ti/wl1251/main.c
++++ b/drivers/net/wireless/ti/wl1251/main.c
+@@ -24,6 +24,9 @@
+ #include <linux/firmware.h>
+ #include <linux/delay.h>
+ #include <linux/irq.h>
++#if (LINUX_VERSION_CODE == KERNEL_VERSION(2,6,28))
++#include <linux/device.h>
++#endif
+ #include <linux/crc32.h>
+ #include <linux/etherdevice.h>
+ #include <linux/vmalloc.h>
+--- a/drivers/net/wireless/ti/wl1251/spi.c
++++ b/drivers/net/wireless/ti/wl1251/spi.c
+@@ -24,6 +24,9 @@
+ #include <linux/module.h>
+ #include <linux/slab.h>
+ #include <linux/crc7.h>
++#if (LINUX_VERSION_CODE == KERNEL_VERSION(2,6,28))
++#include <linux/device.h>
++#endif
+ #include <linux/spi/spi.h>
+ #include <linux/wl12xx.h>
+ 
+--- a/net/mac80211/key.c
++++ b/net/mac80211/key.c
+@@ -24,6 +24,9 @@
+ #include "aes_ccm.h"
+ #include "aes_cmac.h"
+ 
++#if (LINUX_VERSION_CODE < KERNEL_VERSION(2,6,29))
++#include <asm/unaligned.h>
++#endif
+ 
+ /**
+  * DOC: Key handling basics

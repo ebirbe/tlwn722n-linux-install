@@ -1,0 +1,32 @@
+The quirks attribute is not available on older kernels.
+
+--- a/drivers/net/wireless/libertas/if_sdio.c
++++ b/drivers/net/wireless/libertas/if_sdio.c
+@@ -852,6 +852,7 @@ static int if_sdio_power_on(struct if_sd
+ 	if (ret)
+ 		goto release;
+ 
++#if (LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,32))
+ 	/* For 1-bit transfers to the 8686 model, we need to enable the
+ 	 * interrupt flag in the CCCR register. Set the MMC_QUIRK_LENIENT_FN0
+ 	 * bit to allow access to non-vendor registers. */
+@@ -870,6 +871,7 @@ static int if_sdio_power_on(struct if_sd
+ 		if (ret)
+ 			goto disable;
+ 	}
++#endif
+ 
+ 	card->ioport = sdio_readb(func, IF_SDIO_IOPORT, &ret);
+ 	if (ret)
+--- a/drivers/net/wireless/mwifiex/sdio.c
++++ b/drivers/net/wireless/mwifiex/sdio.c
+@@ -75,7 +75,9 @@ mwifiex_sdio_probe(struct sdio_func *fun
+ 
+ 	card->func = func;
+ 
++#if (LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,34))
+ 	func->card->quirks |= MMC_QUIRK_BLKSZ_FOR_BYTE_MODE;
++#endif
+ 
+ 	sdio_claim_host(func);
+ 	ret = sdio_enable_func(func);

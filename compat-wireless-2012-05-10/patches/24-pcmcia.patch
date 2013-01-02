@@ -1,0 +1,1413 @@
+--- a/drivers/bluetooth/bluecard_cs.c
++++ b/drivers/bluetooth/bluecard_cs.c
+@@ -158,7 +158,12 @@ static void bluecard_detach(struct pcmci
+ static void bluecard_activity_led_timeout(u_long arg)
+ {
+ 	bluecard_info_t *info = (bluecard_info_t *)arg;
++#if (LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,36))
+ 	unsigned int iobase = info->p_dev->resource[0]->start;
++#else
++	unsigned int iobase = info->p_dev->io.BasePort1;
++#endif
++
+ 
+ 	if (!test_bit(CARD_HAS_PCCARD_ID, &(info->hw_state)))
+ 		return;
+@@ -175,7 +180,11 @@ static void bluecard_activity_led_timeou
+ 
+ static void bluecard_enable_activity_led(bluecard_info_t *info)
+ {
++#if (LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,36))
+ 	unsigned int iobase = info->p_dev->resource[0]->start;
++#else
++	unsigned int iobase = info->p_dev->io.BasePort1;
++#endif
+ 
+ 	if (!test_bit(CARD_HAS_PCCARD_ID, &(info->hw_state)))
+ 		return;
+@@ -231,7 +240,11 @@ static void bluecard_write_wakeup(blueca
+ 	}
+ 
+ 	do {
++#if (LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,36))
+ 		register unsigned int iobase = info->p_dev->resource[0]->start;
++#else
++		register unsigned int iobase = info->p_dev->io.BasePort1;
++#endif
+ 		register unsigned int offset;
+ 		register unsigned char command;
+ 		register unsigned long ready_bit;
+@@ -378,7 +391,11 @@ static void bluecard_receive(bluecard_in
+ 		return;
+ 	}
+ 
++#if (LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,36))
+ 	iobase = info->p_dev->resource[0]->start;
++#else
++	iobase = info->p_dev->io.BasePort1;
++#endif
+ 
+ 	if (test_bit(XMIT_SENDING_READY, &(info->tx_state)))
+ 		bluecard_enable_activity_led(info);
+@@ -507,7 +524,11 @@ static irqreturn_t bluecard_interrupt(in
+ 	if (!test_bit(CARD_READY, &(info->hw_state)))
+ 		return IRQ_HANDLED;
+ 
++#if (LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,36))
+ 	iobase = info->p_dev->resource[0]->start;
++#else
++	iobase = info->p_dev->io.BasePort1;
++#endif
+ 
+ 	spin_lock(&(info->lock));
+ 
+@@ -621,7 +642,11 @@ static int bluecard_hci_flush(struct hci
+ static int bluecard_hci_open(struct hci_dev *hdev)
+ {
+ 	bluecard_info_t *info = hci_get_drvdata(hdev);
++#if (LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,36))
+ 	unsigned int iobase = info->p_dev->resource[0]->start;
++#else
++	unsigned int iobase = info->p_dev->io.BasePort1;
++#endif
+ 
+ 	if (test_bit(CARD_HAS_PCCARD_ID, &(info->hw_state)))
+ 		bluecard_hci_set_baud_rate(hdev, DEFAULT_BAUD_RATE);
+@@ -641,7 +666,11 @@ static int bluecard_hci_open(struct hci_
+ static int bluecard_hci_close(struct hci_dev *hdev)
+ {
+ 	bluecard_info_t *info = hci_get_drvdata(hdev);
++#if (LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,36))
+ 	unsigned int iobase = info->p_dev->resource[0]->start;
++#else
++	unsigned int iobase = info->p_dev->io.BasePort1;
++#endif
+ 
+ 	if (!test_and_clear_bit(HCI_RUNNING, &(hdev->flags)))
+ 		return 0;
+@@ -703,7 +732,11 @@ static int bluecard_hci_ioctl(struct hci
+ 
+ static int bluecard_open(bluecard_info_t *info)
+ {
++#if (LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,36))
+ 	unsigned int iobase = info->p_dev->resource[0]->start;
++#else
++	unsigned int iobase = info->p_dev->io.BasePort1;
++#endif
+ 	struct hci_dev *hdev;
+ 	unsigned char id;
+ 
+@@ -819,7 +852,11 @@ static int bluecard_open(bluecard_info_t
+ 
+ static int bluecard_close(bluecard_info_t *info)
+ {
++#if (LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,36))
+ 	unsigned int iobase = info->p_dev->resource[0]->start;
++#else
++	unsigned int iobase = info->p_dev->io.BasePort1;
++#endif
+ 	struct hci_dev *hdev = info->hdev;
+ 
+ 	if (!hdev)
+@@ -854,7 +891,18 @@ static int bluecard_probe(struct pcmcia_
+ 	info->p_dev = link;
+ 	link->priv = info;
+ 
++#if (LINUX_VERSION_CODE < KERNEL_VERSION(2,6,35))
++	link->irq.Attributes = IRQ_TYPE_DYNAMIC_SHARING;
++
++	link->irq.Handler = bluecard_interrupt;
++#endif
++
++#if (LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,37))
+ 	link->config_flags |= CONF_ENABLE_IRQ;
++#else
++	link->conf.Attributes = CONF_ENABLE_IRQ;
++	link->conf.IntType = INT_MEMORY_AND_IO;
++#endif
+ 
+ 	return bluecard_config(link);
+ }
+@@ -874,15 +922,30 @@ static int bluecard_config(struct pcmcia
+ 	bluecard_info_t *info = link->priv;
+ 	int i, n;
+ 
++#if (LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,37))
+ 	link->config_index = 0x20;
++#else
++	link->conf.ConfigIndex = 0x20;
++#endif
+ 
++#if (LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,36))
+ 	link->resource[0]->flags |= IO_DATA_PATH_WIDTH_8;
+ 	link->resource[0]->end = 64;
+ 	link->io_lines = 6;
++#else
++	link->io.Attributes1 = IO_DATA_PATH_WIDTH_8;
++	link->io.NumPorts1 = 64;
++	link->io.IOAddrLines = 6;
++#endif
+ 
+ 	for (n = 0; n < 0x400; n += 0x40) {
++#if (LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,36))
+ 		link->resource[0]->start = n ^ 0x300;
+ 		i = pcmcia_request_io(link);
++#else
++		link->io.BasePort1 = n ^ 0x300;
++		i = pcmcia_request_io(link, &link->io);
++#endif
+ 		if (i == 0)
+ 			break;
+ 	}
+@@ -890,9 +953,15 @@ static int bluecard_config(struct pcmcia
+ 	if (i != 0)
+ 		goto failed;
+ 
++#if (LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,35))
+ 	i = pcmcia_request_irq(link, bluecard_interrupt);
+ 	if (i != 0)
+ 		goto failed;
++#else
++	i = pcmcia_request_irq(link, &link->irq);
++	if (i != 0)
++		link->irq.AssignedIRQ = 0;
++#endif
+ 
+ 	i = pcmcia_enable_device(link);
+ 	if (i != 0)
+@@ -930,7 +999,13 @@ MODULE_DEVICE_TABLE(pcmcia, bluecard_ids
+ 
+ static struct pcmcia_driver bluecard_driver = {
+ 	.owner		= THIS_MODULE,
++#if (LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,37))
+ 	.name		= "bluecard_cs",
++#else
++	.drv		= {
++		.name	= "bluecard_cs",
++	},
++#endif
+ 	.probe		= bluecard_probe,
+ 	.remove		= bluecard_detach,
+ 	.id_table	= bluecard_ids,
+--- a/drivers/bluetooth/bt3c_cs.c
++++ b/drivers/bluetooth/bt3c_cs.c
+@@ -186,7 +186,11 @@ static void bt3c_write_wakeup(bt3c_info_
+ 		return;
+ 
+ 	do {
++#if (LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,36))
+ 		register unsigned int iobase = info->p_dev->resource[0]->start;
++#else
++		register unsigned int iobase = info->p_dev->io.BasePort1;
++#endif
+ 		register struct sk_buff *skb;
+ 		register int len;
+ 
+@@ -224,7 +228,11 @@ static void bt3c_receive(bt3c_info_t *in
+ 		return;
+ 	}
+ 
++#if (LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,36))
+ 	iobase = info->p_dev->resource[0]->start;
++#else
++	iobase = info->p_dev->io.BasePort1;
++#endif
+ 
+ 	avail = bt3c_read(iobase, 0x7006);
+ 	//printk("bt3c_cs: receiving %d bytes\n", avail);
+@@ -345,7 +353,11 @@ static irqreturn_t bt3c_interrupt(int ir
+ 		/* our irq handler is shared */
+ 		return IRQ_NONE;
+ 
++#if (LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,36))
+ 	iobase = info->p_dev->resource[0]->start;
++#else
++	iobase = info->p_dev->io.BasePort1;
++#endif
+ 
+ 	spin_lock(&(info->lock));
+ 
+@@ -473,7 +485,11 @@ static int bt3c_load_firmware(bt3c_info_
+ 	unsigned int iobase, size, addr, fcs, tmp;
+ 	int i, err = 0;
+ 
++#if (LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,36))
+ 	iobase = info->p_dev->resource[0]->start;
++#else
++	iobase = info->p_dev->io.BasePort1;
++#endif
+ 
+ 	/* Reset */
+ 	bt3c_io_write(iobase, 0x8040, 0x0404);
+@@ -645,8 +661,27 @@ static int bt3c_probe(struct pcmcia_devi
+ 	info->p_dev = link;
+ 	link->priv = info;
+ 
++#if (LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,37))
+ 	link->config_flags |= CONF_ENABLE_IRQ | CONF_AUTO_SET_VPP |
+ 		CONF_AUTO_SET_IO;
++#else
++#if (LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,36))
++	link->resource[0]->flags |= IO_DATA_PATH_WIDTH_8;
++	link->resource[0]->end = 8;
++#else
++	link->io.Attributes1 = IO_DATA_PATH_WIDTH_8;
++	link->io.NumPorts1= 8;
++#endif
++
++#if (LINUX_VERSION_CODE < KERNEL_VERSION(2,6,35))
++	link->irq.Attributes = IRQ_TYPE_DYNAMIC_SHARING;
++
++	link->irq.Handler = bt3c_interrupt;
++#endif
++
++	link->conf.Attributes = CONF_ENABLE_IRQ;
++	link->conf.IntType = INT_MEMORY_AND_IO;
++#endif
+ 
+ 	return bt3c_config(link);
+ }
+@@ -660,6 +695,7 @@ static void bt3c_detach(struct pcmcia_de
+ 	kfree(info);
+ }
+ 
++#if (LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,37))
+ static int bt3c_check_config(struct pcmcia_device *p_dev, void *priv_data)
+ {
+ 	int *try = priv_data;
+@@ -698,6 +734,63 @@ static int bt3c_check_config_notpicky(st
+ 	}
+ 	return -ENODEV;
+ }
++#else
++static int bt3c_check_config(struct pcmcia_device *p_dev,
++			     cistpl_cftable_entry_t *cf,
++			     cistpl_cftable_entry_t *dflt,
++			     unsigned int vcc,
++			     void *priv_data)
++{
++	unsigned long try = (unsigned long) priv_data;
++
++#if (LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,36))
++	p_dev->io_lines = (try == 0) ? 16 : cf->io.flags & CISTPL_IO_LINES_MASK;
++#endif
++
++	if (cf->vpp1.present & (1 << CISTPL_POWER_VNOM))
++		p_dev->conf.Vpp = cf->vpp1.param[CISTPL_POWER_VNOM] / 10000;
++	if ((cf->io.nwin > 0) && (cf->io.win[0].len == 8) &&
++	    (cf->io.win[0].base != 0)) {
++#if (LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,36))
++		p_dev->resource[0]->start = cf->io.win[0].base;
++		if (!pcmcia_request_io(p_dev))
++#else
++		p_dev->io.BasePort1 = cf->io.win[0].base;
++		p_dev->io.IOAddrLines = (try == 0) ? 16 :
++			cf->io.flags & CISTPL_IO_LINES_MASK;
++		if (!pcmcia_request_io(p_dev, &p_dev->io))
++#endif
++			return 0;
++	}
++	return -ENODEV;
++}
++
++static int bt3c_check_config_notpicky(struct pcmcia_device *p_dev,
++				      cistpl_cftable_entry_t *cf,
++				      cistpl_cftable_entry_t *dflt,
++				      unsigned int vcc,
++				      void *priv_data)
++{
++	static unsigned int base[5] = { 0x3f8, 0x2f8, 0x3e8, 0x2e8, 0x0 };
++	int j;
++
++	if ((cf->io.nwin > 0) && ((cf->io.flags & CISTPL_IO_LINES_MASK) <= 3)) {
++		for (j = 0; j < 5; j++) {
++#if (LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,36))
++			p_dev->resource[0]->start = base[j];
++			p_dev->io_lines = base[j] ? 16 : 3;
++			if (!pcmcia_request_io(p_dev))
++#else
++			p_dev->io.BasePort1 = base[j];
++			p_dev->io.IOAddrLines = base[j] ? 16 : 3;
++			if (!pcmcia_request_io(p_dev, &p_dev->io))
++#endif
++				return 0;
++		}
++	}
++	return -ENODEV;
++}
++#endif
+ 
+ static int bt3c_config(struct pcmcia_device *link)
+ {
+@@ -721,9 +814,15 @@ static int bt3c_config(struct pcmcia_dev
+ 	goto failed;
+ 
+ found_port:
++#if (LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,35))
+ 	i = pcmcia_request_irq(link, &bt3c_interrupt);
+ 	if (i != 0)
+ 		goto failed;
++#else
++	i = pcmcia_request_irq(link, &link->irq);
++	if (i != 0)
++		link->irq.AssignedIRQ = 0;
++#endif
+ 
+ 	i = pcmcia_enable_device(link);
+ 	if (i != 0)
+@@ -758,7 +857,13 @@ MODULE_DEVICE_TABLE(pcmcia, bt3c_ids);
+ 
+ static struct pcmcia_driver bt3c_driver = {
+ 	.owner		= THIS_MODULE,
++#if (LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,37))
+ 	.name		= "bt3c_cs",
++#else
++	.drv		= {
++		.name	= "bt3c_cs",
++	},
++#endif
+ 	.probe		= bt3c_probe,
+ 	.remove		= bt3c_detach,
+ 	.id_table	= bt3c_ids,
+--- a/drivers/bluetooth/btuart_cs.c
++++ b/drivers/bluetooth/btuart_cs.c
+@@ -140,7 +140,11 @@ static void btuart_write_wakeup(btuart_i
+ 	}
+ 
+ 	do {
++#if (LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,36))
+ 		register unsigned int iobase = info->p_dev->resource[0]->start;
++#else
++		register unsigned int iobase = info->p_dev->io.BasePort1;
++#endif
+ 		register struct sk_buff *skb;
+ 		register int len;
+ 
+@@ -181,7 +185,11 @@ static void btuart_receive(btuart_info_t
+ 		return;
+ 	}
+ 
++#if (LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,36))
+ 	iobase = info->p_dev->resource[0]->start;
++#else
++	iobase = info->p_dev->io.BasePort1;
++#endif
+ 
+ 	do {
+ 		info->hdev->stat.byte_rx++;
+@@ -295,7 +303,11 @@ static irqreturn_t btuart_interrupt(int
+ 		/* our irq handler is shared */
+ 		return IRQ_NONE;
+ 
++#if (LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,36))
+ 	iobase = info->p_dev->resource[0]->start;
++#else
++	iobase = info->p_dev->io.BasePort1;
++#endif
+ 
+ 	spin_lock(&(info->lock));
+ 
+@@ -352,7 +364,11 @@ static void btuart_change_speed(btuart_i
+ 		return;
+ 	}
+ 
++#if (LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,36))
+ 	iobase = info->p_dev->resource[0]->start;
++#else
++	iobase = info->p_dev->io.BasePort1;
++#endif
+ 
+ 	spin_lock_irqsave(&(info->lock), flags);
+ 
+@@ -471,7 +487,11 @@ static int btuart_hci_ioctl(struct hci_d
+ static int btuart_open(btuart_info_t *info)
+ {
+ 	unsigned long flags;
++#if (LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,36))
+ 	unsigned int iobase = info->p_dev->resource[0]->start;
++#else
++	unsigned int iobase = info->p_dev->io.BasePort1;
++#endif
+ 	struct hci_dev *hdev;
+ 
+ 	spin_lock_init(&(info->lock));
+@@ -538,7 +558,11 @@ static int btuart_open(btuart_info_t *in
+ static int btuart_close(btuart_info_t *info)
+ {
+ 	unsigned long flags;
++#if (LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,36))
+ 	unsigned int iobase = info->p_dev->resource[0]->start;
++#else
++	unsigned int iobase = info->p_dev->io.BasePort1;
++#endif
+ 	struct hci_dev *hdev = info->hdev;
+ 
+ 	if (!hdev)
+@@ -574,8 +598,27 @@ static int btuart_probe(struct pcmcia_de
+ 	info->p_dev = link;
+ 	link->priv = info;
+ 
++#if (LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,37))
+ 	link->config_flags |= CONF_ENABLE_IRQ | CONF_AUTO_SET_VPP |
+ 		CONF_AUTO_SET_IO;
++#else
++#if (LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,36))
++	link->resource[0]->flags |= IO_DATA_PATH_WIDTH_8;
++	link->resource[0]->end = 8;
++#else
++	link->io.Attributes1 = IO_DATA_PATH_WIDTH_8;
++	link->io.NumPorts1= 8;
++#endif
++
++#if (LINUX_VERSION_CODE < KERNEL_VERSION(2,6,35))
++	link->irq.Attributes = IRQ_TYPE_DYNAMIC_SHARING;
++
++	link->irq.Handler = btuart_interrupt;
++#endif
++
++	link->conf.Attributes = CONF_ENABLE_IRQ;
++	link->conf.IntType = INT_MEMORY_AND_IO;
++#endif
+ 
+ 	return btuart_config(link);
+ }
+@@ -589,6 +632,7 @@ static void btuart_detach(struct pcmcia_
+ 	kfree(info);
+ }
+ 
++#if (LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,37))
+ static int btuart_check_config(struct pcmcia_device *p_dev, void *priv_data)
+ {
+ 	int *try = priv_data;
+@@ -627,6 +671,63 @@ static int btuart_check_config_notpicky(
+ 	}
+ 	return -ENODEV;
+ }
++#else
++static int btuart_check_config(struct pcmcia_device *p_dev,
++			       cistpl_cftable_entry_t *cf,
++			       cistpl_cftable_entry_t *dflt,
++			       unsigned int vcc,
++			       void *priv_data)
++{
++	int *try = priv_data;
++
++#if (LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,36))
++	p_dev->io_lines = (try == 0) ? 16 : cf->io.flags & CISTPL_IO_LINES_MASK;
++#endif
++
++	if (cf->vpp1.present & (1 << CISTPL_POWER_VNOM))
++		p_dev->conf.Vpp = cf->vpp1.param[CISTPL_POWER_VNOM] / 10000;
++	if ((cf->io.nwin > 0) && (cf->io.win[0].len == 8) &&
++	    (cf->io.win[0].base != 0)) {
++#if (LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,36))
++		p_dev->resource[0]->start = cf->io.win[0].base;
++		if (!pcmcia_request_io(p_dev))
++#else
++		p_dev->io.BasePort1 = cf->io.win[0].base;
++		p_dev->io.IOAddrLines = (*try == 0) ? 16 :
++			cf->io.flags & CISTPL_IO_LINES_MASK;
++		if (!pcmcia_request_io(p_dev, &p_dev->io))
++#endif
++			return 0;
++	}
++	return -ENODEV;
++}
++
++static int btuart_check_config_notpicky(struct pcmcia_device *p_dev,
++					cistpl_cftable_entry_t *cf,
++					cistpl_cftable_entry_t *dflt,
++					unsigned int vcc,
++					void *priv_data)
++{
++	static unsigned int base[5] = { 0x3f8, 0x2f8, 0x3e8, 0x2e8, 0x0 };
++	int j;
++
++	if ((cf->io.nwin > 0) && ((cf->io.flags & CISTPL_IO_LINES_MASK) <= 3)) {
++		for (j = 0; j < 5; j++) {
++#if (LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,36))
++			p_dev->resource[0]->start = base[j];
++			p_dev->io_lines = base[j] ? 16 : 3;
++			if (!pcmcia_request_io(p_dev))
++#else
++			p_dev->io.BasePort1 = base[j];
++			p_dev->io.IOAddrLines = base[j] ? 16 : 3;
++			if (!pcmcia_request_io(p_dev, &p_dev->io))
++#endif
++				return 0;
++		}
++	}
++	return -ENODEV;
++}
++#endif
+ 
+ static int btuart_config(struct pcmcia_device *link)
+ {
+@@ -650,9 +751,15 @@ static int btuart_config(struct pcmcia_d
+ 	goto failed;
+ 
+ found_port:
++#if (LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,35))
+ 	i = pcmcia_request_irq(link, btuart_interrupt);
+ 	if (i != 0)
+ 		goto failed;
++#else
++	i = pcmcia_request_irq(link, &link->irq);
++	if (i != 0)
++		link->irq.AssignedIRQ = 0;
++#endif
+ 
+ 	i = pcmcia_enable_device(link);
+ 	if (i != 0)
+@@ -686,7 +793,13 @@ MODULE_DEVICE_TABLE(pcmcia, btuart_ids);
+ 
+ static struct pcmcia_driver btuart_driver = {
+ 	.owner		= THIS_MODULE,
++#if (LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,37))
+ 	.name		= "btuart_cs",
++#else
++	.drv		= {
++		.name	= "btuart_cs",
++	},
++#endif
+ 	.probe		= btuart_probe,
+ 	.remove		= btuart_detach,
+ 	.id_table	= btuart_ids,
+--- a/drivers/bluetooth/dtl1_cs.c
++++ b/drivers/bluetooth/dtl1_cs.c
+@@ -144,7 +144,11 @@ static void dtl1_write_wakeup(dtl1_info_
+ 	}
+ 
+ 	do {
++#if (LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,36))
+ 		register unsigned int iobase = info->p_dev->resource[0]->start;
++#else
++		register unsigned int iobase = info->p_dev->io.BasePort1;
++#endif
+ 		register struct sk_buff *skb;
+ 		register int len;
+ 
+@@ -209,7 +213,11 @@ static void dtl1_receive(dtl1_info_t *in
+ 		return;
+ 	}
+ 
++#if (LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,36))
+ 	iobase = info->p_dev->resource[0]->start;
++#else
++	iobase = info->p_dev->io.BasePort1;
++#endif
+ 
+ 	do {
+ 		info->hdev->stat.byte_rx++;
+@@ -296,7 +304,11 @@ static irqreturn_t dtl1_interrupt(int ir
+ 		/* our irq handler is shared */
+ 		return IRQ_NONE;
+ 
++#if (LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,36))
+ 	iobase = info->p_dev->resource[0]->start;
++#else
++	iobase = info->p_dev->io.BasePort1;
++#endif
+ 
+ 	spin_lock(&(info->lock));
+ 
+@@ -451,7 +463,11 @@ static int dtl1_hci_ioctl(struct hci_dev
+ static int dtl1_open(dtl1_info_t *info)
+ {
+ 	unsigned long flags;
++#if (LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,36))
+ 	unsigned int iobase = info->p_dev->resource[0]->start;
++#else
++	unsigned int iobase = info->p_dev->io.BasePort1;
++#endif
+ 	struct hci_dev *hdev;
+ 
+ 	spin_lock_init(&(info->lock));
+@@ -495,8 +511,13 @@ static int dtl1_open(dtl1_info_t *info)
+ 	outb(UART_LCR_WLEN8, iobase + UART_LCR);	/* Reset DLAB */
+ 	outb((UART_MCR_DTR | UART_MCR_RTS | UART_MCR_OUT2), iobase + UART_MCR);
+ 
++#if (LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,36))
+ 	info->ri_latch = inb(info->p_dev->resource[0]->start + UART_MSR)
+ 				& UART_MSR_RI;
++#else
++	info->ri_latch = inb(info->p_dev->io.BasePort1 + UART_MSR)
++				& UART_MSR_RI;
++#endif
+ 
+ 	/* Turn on interrupts */
+ 	outb(UART_IER_RLSI | UART_IER_RDI | UART_IER_THRI, iobase + UART_IER);
+@@ -521,7 +542,11 @@ static int dtl1_open(dtl1_info_t *info)
+ static int dtl1_close(dtl1_info_t *info)
+ {
+ 	unsigned long flags;
++#if (LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,36))
+ 	unsigned int iobase = info->p_dev->resource[0]->start;
++#else
++	unsigned int iobase = info->p_dev->io.BasePort1;
++#endif
+ 	struct hci_dev *hdev = info->hdev;
+ 
+ 	if (!hdev)
+@@ -557,7 +582,24 @@ static int dtl1_probe(struct pcmcia_devi
+ 	info->p_dev = link;
+ 	link->priv = info;
+ 
++#if (LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,37))
+ 	link->config_flags |= CONF_ENABLE_IRQ | CONF_AUTO_SET_IO;
++#else
++#if (LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,36))
++	link->resource[0]->flags |= IO_DATA_PATH_WIDTH_8;
++	link->resource[0]->end = 8;
++#else
++	link->io.Attributes1 = IO_DATA_PATH_WIDTH_8;
++	link->io.NumPorts1= 8;
++#endif
++#if (LINUX_VERSION_CODE < KERNEL_VERSION(2,6,35))
++	link->irq.Attributes = IRQ_TYPE_DYNAMIC_SHARING;
++	link->irq.Handler = dtl1_interrupt;
++#endif
++
++	link->conf.Attributes = CONF_ENABLE_IRQ;
++	link->conf.IntType = INT_MEMORY_AND_IO;
++#endif
+ 
+ 	return dtl1_config(link);
+ }
+@@ -572,6 +614,7 @@ static void dtl1_detach(struct pcmcia_de
+ 	kfree(info);
+ }
+ 
++#if (LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,37))
+ static int dtl1_confcheck(struct pcmcia_device *p_dev, void *priv_data)
+ {
+ 	if ((p_dev->resource[1]->end) || (p_dev->resource[1]->end < 8))
+@@ -582,6 +625,29 @@ static int dtl1_confcheck(struct pcmcia_
+ 
+ 	return pcmcia_request_io(p_dev);
+ }
++#else
++static int dtl1_confcheck(struct pcmcia_device *p_dev,
++			  cistpl_cftable_entry_t *cf,
++			  cistpl_cftable_entry_t *dflt,
++			  unsigned int vcc,
++			  void *priv_data)
++{
++	if ((cf->io.nwin != 1) || (cf->io.win[0].len <= 8))
++		return -ENODEV;
++
++#if (LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,36))
++	p_dev->resource[0]->start = cf->io.win[0].base;
++	p_dev->resource[0]->end = cf->io.win[0].len;	/*yo */
++	p_dev->io_lines = cf->io.flags & CISTPL_IO_LINES_MASK;
++	return pcmcia_request_io(p_dev);
++#else
++	p_dev->io.BasePort1 = cf->io.win[0].base;
++	p_dev->io.NumPorts1 = cf->io.win[0].len;	/*yo */
++	p_dev->io.IOAddrLines = cf->io.flags & CISTPL_IO_LINES_MASK;
++	return pcmcia_request_io(p_dev, &p_dev->io);
++#endif
++}
++#endif
+ 
+ static int dtl1_config(struct pcmcia_device *link)
+ {
+@@ -589,13 +655,23 @@ static int dtl1_config(struct pcmcia_dev
+ 	int i;
+ 
+ 	/* Look for a generic full-sized window */
++#if (LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,36))
+ 	link->resource[0]->end = 8;
++#else
++	link->io.NumPorts1 = 8;
++#endif
+ 	if (pcmcia_loop_config(link, dtl1_confcheck, NULL) < 0)
+ 		goto failed;
+ 
++#if (LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,35))
+ 	i = pcmcia_request_irq(link, dtl1_interrupt);
+ 	if (i != 0)
+ 		goto failed;
++#else
++	i = pcmcia_request_irq(link, &link->irq);
++	if (i != 0)
++		link->irq.AssignedIRQ = 0;
++#endif
+ 
+ 	i = pcmcia_enable_device(link);
+ 	if (i != 0)
+@@ -622,7 +698,13 @@ MODULE_DEVICE_TABLE(pcmcia, dtl1_ids);
+ 
+ static struct pcmcia_driver dtl1_driver = {
+ 	.owner		= THIS_MODULE,
++#if (LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,37))
+ 	.name		= "dtl1_cs",
++#else
++	.drv		= {
++		.name	= "dtl1_cs",
++	},
++#endif
+ 	.probe		= dtl1_probe,
+ 	.remove		= dtl1_detach,
+ 	.id_table	= dtl1_ids,
+--- a/drivers/net/wireless/b43/pcmcia.c
++++ b/drivers/net/wireless/b43/pcmcia.c
+@@ -63,6 +63,9 @@ static int b43_pcmcia_resume(struct pcmc
+ static int __devinit b43_pcmcia_probe(struct pcmcia_device *dev)
+ {
+ 	struct ssb_bus *ssb;
++#if (LINUX_VERSION_CODE < KERNEL_VERSION(2,6,37))
++	win_req_t win;
++#endif
+ 	int err = -ENOMEM;
+ 	int res = 0;
+ 
+@@ -72,6 +75,7 @@ static int __devinit b43_pcmcia_probe(st
+ 
+ 	err = -ENODEV;
+ 
++#if (LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,37))
+ 	dev->config_flags |= CONF_ENABLE_IRQ;
+ 
+ 	dev->resource[2]->flags |=  WIN_ENABLE | WIN_DATA_WIDTH_16 |
+@@ -79,21 +83,46 @@ static int __devinit b43_pcmcia_probe(st
+ 	dev->resource[2]->start = 0;
+ 	dev->resource[2]->end = SSB_CORE_SIZE;
+ 	res = pcmcia_request_window(dev, dev->resource[2], 250);
++#else
++	dev->conf.Attributes = CONF_ENABLE_IRQ;
++	dev->conf.IntType = INT_MEMORY_AND_IO;
++
++	win.Attributes =  WIN_ENABLE | WIN_DATA_WIDTH_16 |
++			 WIN_USE_WAIT;
++	win.Base = 0;
++	win.Size = SSB_CORE_SIZE;
++	win.AccessSpeed = 250;
++	res = pcmcia_request_window(dev, &win, &dev->win);
++#endif
+ 	if (res != 0)
+ 		goto err_kfree_ssb;
+-
++#if (LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,37))
+ 	res = pcmcia_map_mem_page(dev, dev->resource[2], 0);
++#else
++	res = pcmcia_map_mem_page(dev, dev->win, 0);
++#endif
+ 	if (res != 0)
+ 		goto err_disable;
+ 
++#if (LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,35))
+ 	if (!dev->irq)
++#else
++	dev->irq.Attributes = IRQ_TYPE_DYNAMIC_SHARING;
++	dev->irq.Handler = NULL; /* The handler is registered later. */
++	res = pcmcia_request_irq(dev, &dev->irq);
++	if (res != 0)
++#endif
+ 		goto err_disable;
+ 
+ 	res = pcmcia_enable_device(dev);
+ 	if (res != 0)
+ 		goto err_disable;
+ 
++#if (LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,37))
+ 	err = ssb_bus_pcmciabus_register(ssb, dev, dev->resource[2]->start);
++#else
++	err = ssb_bus_pcmciabus_register(ssb, dev, win.Base);
++#endif
+ 	if (err)
+ 		goto err_disable;
+ 	dev->priv = ssb;
+@@ -122,7 +151,13 @@ static void __devexit b43_pcmcia_remove(
+ 
+ static struct pcmcia_driver b43_pcmcia_driver = {
+ 	.owner		= THIS_MODULE,
++#if (LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,37))
+ 	.name		= "b43-pcmcia",
++#else
++	.drv		= {
++		.name	= "b43-pcmcia",
++	},
++#endif
+ 	.id_table	= b43_pcmcia_tbl,
+ 	.probe		= b43_pcmcia_probe,
+ 	.remove		= __devexit_p(b43_pcmcia_remove),
+--- a/drivers/net/wireless/libertas/if_cs.c
++++ b/drivers/net/wireless/libertas/if_cs.c
+@@ -757,7 +757,11 @@ static void if_cs_prog_firmware(struct l
+ 		goto out;
+ 
+ 	/* Now actually get the IRQ */
++#if (LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,35))
+ 	ret = request_irq(card->p_dev->irq, if_cs_interrupt,
++#else
++	ret = request_irq(card->p_dev->irq.AssignedIRQ, if_cs_interrupt,
++#endif
+ 		IRQF_SHARED, DRV_NAME, card);
+ 	if (ret) {
+ 		pr_err("error in request_irq\n");
+@@ -775,7 +779,11 @@ static void if_cs_prog_firmware(struct l
+ 	priv->fw_ready = 1;
+ 	if (lbs_start_card(priv) != 0) {
+ 		pr_err("could not activate card\n");
++#if (LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,35))
+ 		free_irq(card->p_dev->irq, card);
++#else
++		free_irq(card->p_dev->irq.AssignedIRQ, card);
++#endif
+ 	}
+ 
+ out:
+@@ -824,7 +832,11 @@ static void if_cs_release(struct pcmcia_
+ 
+ 	lbs_deb_enter(LBS_DEB_CS);
+ 
++#if (LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,35))
+ 	free_irq(p_dev->irq, card);
++#else
++	free_irq(p_dev->irq.AssignedIRQ, card);
++#endif
+ 	pcmcia_disable_device(p_dev);
+ 	if (card->iobase)
+ 		ioport_unmap(card->iobase);
+@@ -832,7 +844,7 @@ static void if_cs_release(struct pcmcia_
+ 	lbs_deb_leave(LBS_DEB_CS);
+ }
+ 
+-
++#if (LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,37))
+ static int if_cs_ioprobe(struct pcmcia_device *p_dev, void *priv_data)
+ {
+ 	p_dev->resource[0]->flags &= ~IO_DATA_PATH_WIDTH;
+@@ -842,9 +854,39 @@ static int if_cs_ioprobe(struct pcmcia_d
+ 		pr_err("wrong CIS (check number of IO windows)\n");
+ 		return -ENODEV;
+ 	}
++#else
++static int if_cs_ioprobe(struct pcmcia_device *p_dev,
++			 cistpl_cftable_entry_t *cfg,
++			 cistpl_cftable_entry_t *dflt,
++			 unsigned int vcc,
++			 void *priv_data)
++{
++#if (LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,36))
++	p_dev->resource[0]->flags |= IO_DATA_PATH_WIDTH_AUTO;
++	p_dev->resource[0]->start = cfg->io.win[0].base;
++	p_dev->resource[0]->end = cfg->io.win[0].len;
++#else
++	p_dev->io.Attributes1 = IO_DATA_PATH_WIDTH_AUTO;
++	p_dev->io.BasePort1 = cfg->io.win[0].base;
++	p_dev->io.NumPorts1 = cfg->io.win[0].len;
++#endif
++
++	/* Do we need to allocate an interrupt? */
++	p_dev->conf.Attributes |= CONF_ENABLE_IRQ;
++
++	/* IO window settings */
++	if (cfg->io.nwin != 1) {
++		pr_err("wrong CIS (check number of IO windows)\n");
++		return -ENODEV;
++	}
++#endif
+ 
+ 	/* This reserves IO space but doesn't actually enable it */
++#if (LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,36))
+ 	return pcmcia_request_io(p_dev);
++#else
++	return pcmcia_request_io(p_dev, &p_dev->io);
++#endif
+ }
+ 
+ static int if_cs_probe(struct pcmcia_device *p_dev)
+@@ -863,7 +905,16 @@ static int if_cs_probe(struct pcmcia_dev
+ 	card->p_dev = p_dev;
+ 	p_dev->priv = card;
+ 
++#if (LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,37))
+ 	p_dev->config_flags |= CONF_ENABLE_IRQ | CONF_AUTO_SET_IO;
++#else
++#if (LINUX_VERSION_CODE < KERNEL_VERSION(2,6,35))
++	p_dev->irq.Attributes = IRQ_TYPE_DYNAMIC_SHARING;
++	p_dev->irq.Handler = NULL;
++#endif
++	p_dev->conf.Attributes = 0;
++	p_dev->conf.IntType = INT_MEMORY_AND_IO;
++#endif
+ 
+ 	if (pcmcia_loop_config(p_dev, if_cs_ioprobe, NULL)) {
+ 		pr_err("error in pcmcia_loop_config\n");
+@@ -875,12 +926,26 @@ static int if_cs_probe(struct pcmcia_dev
+ 	 * a handler to the interrupt, unless the 'Handler' member of
+ 	 * the irq structure is initialized.
+ 	 */
++#if (LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,35))
+ 	if (!p_dev->irq)
+ 		goto out1;
++#else
++	if (p_dev->conf.Attributes & CONF_ENABLE_IRQ) {
++		ret = pcmcia_request_irq(p_dev, &p_dev->irq);
++		if (ret) {
++			pr_err("error in pcmcia_request_irq\n");
++			goto out1;
++		}
++	}
++#endif
+ 
+ 	/* Initialize io access */
++#if (LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,36))
+ 	card->iobase = ioport_map(p_dev->resource[0]->start,
+ 				resource_size(p_dev->resource[0]));
++#else
++	card->iobase = ioport_map(p_dev->io.BasePort1, p_dev->io.NumPorts1);
++#endif
+ 	if (!card->iobase) {
+ 		pr_err("error in ioport_map\n");
+ 		ret = -EIO;
+@@ -894,7 +959,17 @@ static int if_cs_probe(struct pcmcia_dev
+ 	}
+ 
+ 	/* Finally, report what we've done */
++#if (LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,36))
+ 	lbs_deb_cs("irq %d, io %pR", p_dev->irq, p_dev->resource[0]);
++#elif (LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,35))
++	lbs_deb_cs("irq %d, io 0x%04x-0x%04x\n",
++		  p_dev->irq, p_dev->io.BasePort1,
++		  p_dev->io.BasePort1 + p_dev->io.NumPorts1 - 1);
++#else
++	lbs_deb_cs("irq %d, io 0x%04x-0x%04x\n",
++		  p_dev->irq.AssignedIRQ, p_dev->io.BasePort1,
++		  p_dev->io.BasePort1 + p_dev->io.NumPorts1 - 1);
++#endif
+ 
+ 	/*
+ 	 * Most of the libertas cards can do unaligned register access, but some
+@@ -1002,7 +1077,13 @@ MODULE_DEVICE_TABLE(pcmcia, if_cs_ids);
+ 
+ static struct pcmcia_driver lbs_driver = {
+ 	.owner		= THIS_MODULE,
++#if (LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,37))
+ 	.name		= DRV_NAME,
++#else
++	.drv		= {
++		.name	= DRV_NAME,
++	},
++#endif
+ 	.probe		= if_cs_probe,
+ 	.remove		= if_cs_detach,
+ 	.id_table       = if_cs_ids,
+--- a/drivers/net/wireless/orinoco/orinoco_cs.c
++++ b/drivers/net/wireless/orinoco/orinoco_cs.c
+@@ -78,7 +78,11 @@ orinoco_cs_hard_reset(struct orinoco_pri
+ 	/* We need atomic ops here, because we're not holding the lock */
+ 	set_bit(0, &card->hard_reset_in_progress);
+ 
++#if LINUX_VERSION_CODE <= KERNEL_VERSION(2,6,27)
++	err = pcmcia_reset_card(link, NULL);
++#else
+ 	err = pcmcia_reset_card(link->socket);
++#endif
+ 	if (err)
+ 		return err;
+ 
+@@ -108,6 +112,16 @@ orinoco_cs_probe(struct pcmcia_device *l
+ 	card->p_dev = link;
+ 	link->priv = priv;
+ 
++#if (LINUX_VERSION_CODE < KERNEL_VERSION(2,6,35))
++	/* Interrupt setup */
++	link->irq.Attributes = IRQ_TYPE_DYNAMIC_SHARING;
++	link->irq.Handler = orinoco_interrupt;
++#endif
++#if (LINUX_VERSION_CODE < KERNEL_VERSION(2,6,37))
++	link->conf.Attributes = 0;
++	link->conf.IntType = INT_MEMORY_AND_IO;
++#endif
++
+ 	return orinoco_cs_config(link);
+ }				/* orinoco_cs_attach */
+ 
+@@ -122,6 +136,7 @@ static void orinoco_cs_detach(struct pcm
+ 	free_orinocodev(priv);
+ }				/* orinoco_cs_detach */
+ 
++#if (LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,37))
+ static int orinoco_cs_config_check(struct pcmcia_device *p_dev, void *priv_data)
+ {
+ 	if (p_dev->config_index == 0)
+@@ -129,6 +144,98 @@ static int orinoco_cs_config_check(struc
+ 
+ 	return pcmcia_request_io(p_dev);
+ };
++#else
++static int orinoco_cs_config_check(struct pcmcia_device *p_dev,
++				   cistpl_cftable_entry_t *cfg,
++				   cistpl_cftable_entry_t *dflt,
++				   unsigned int vcc,
++				   void *priv_data)
++{
++	if (cfg->index == 0)
++		goto next_entry;
++
++	/* Use power settings for Vcc and Vpp if present */
++	/* Note that the CIS values need to be rescaled */
++	if (cfg->vcc.present & (1 << CISTPL_POWER_VNOM)) {
++		if (vcc != cfg->vcc.param[CISTPL_POWER_VNOM] / 10000) {
++			DEBUG(2, "%s: Vcc mismatch (vcc = %d, CIS = %d)\n",
++			      __func__, vcc,
++			      cfg->vcc.param[CISTPL_POWER_VNOM] / 10000);
++			if (!ignore_cis_vcc)
++				goto next_entry;
++		}
++	} else if (dflt->vcc.present & (1 << CISTPL_POWER_VNOM)) {
++		if (vcc != dflt->vcc.param[CISTPL_POWER_VNOM] / 10000) {
++			DEBUG(2, "%s: Vcc mismatch (vcc = %d, CIS = %d)\n",
++			      __func__, vcc,
++			      dflt->vcc.param[CISTPL_POWER_VNOM] / 10000);
++			if (!ignore_cis_vcc)
++				goto next_entry;
++		}
++	}
++
++	if (cfg->vpp1.present & (1 << CISTPL_POWER_VNOM))
++		p_dev->conf.Vpp =
++			cfg->vpp1.param[CISTPL_POWER_VNOM] / 10000;
++	else if (dflt->vpp1.present & (1 << CISTPL_POWER_VNOM))
++		p_dev->conf.Vpp =
++			dflt->vpp1.param[CISTPL_POWER_VNOM] / 10000;
++
++	/* Do we need to allocate an interrupt? */
++	p_dev->conf.Attributes |= CONF_ENABLE_IRQ;
++
++	/* IO window settings */
++#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,36)
++	p_dev->resource[0]->end = p_dev->resource[1]->end = 0;
++#else
++	p_dev->io.NumPorts1 = p_dev->io.NumPorts2 = 0;
++#endif
++	if ((cfg->io.nwin > 0) || (dflt->io.nwin > 0)) {
++		cistpl_io_t *io = (cfg->io.nwin) ? &cfg->io : &dflt->io;
++#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,36)
++		p_dev->io_lines = io->flags & CISTPL_IO_LINES_MASK;
++		p_dev->resource[0]->flags &= ~IO_DATA_PATH_WIDTH;
++		p_dev->resource[0]->flags |=
++			pcmcia_io_cfg_data_width(io->flags);
++		p_dev->resource[0]->start = io->win[0].base;
++		p_dev->resource[0]->end = io->win[0].len;
++#else
++		p_dev->io.Attributes1 = IO_DATA_PATH_WIDTH_AUTO;
++		if (!(io->flags & CISTPL_IO_8BIT))
++			p_dev->io.Attributes1 = IO_DATA_PATH_WIDTH_16;
++		if (!(io->flags & CISTPL_IO_16BIT))
++			p_dev->io.Attributes1 = IO_DATA_PATH_WIDTH_8;
++		p_dev->io.IOAddrLines = io->flags & CISTPL_IO_LINES_MASK;
++		p_dev->io.BasePort1 = io->win[0].base;
++		p_dev->io.NumPorts1 = io->win[0].len;
++#endif
++		if (io->nwin > 1) {
++#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,36)
++			p_dev->resource[1]->flags = p_dev->resource[0]->flags;
++			p_dev->resource[1]->start = io->win[1].base;
++			p_dev->resource[1]->end = io->win[1].len;
++#else
++			p_dev->io.Attributes2 = p_dev->io.Attributes1;
++			p_dev->io.BasePort2 = io->win[1].base;
++			p_dev->io.NumPorts2 = io->win[1].len;
++#endif
++		}
++
++		/* This reserves IO space but doesn't actually enable it */
++#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,36)
++		if (pcmcia_request_io(p_dev) != 0)
++#else
++		if (pcmcia_request_io(p_dev, &p_dev->io) != 0)
++#endif
++			goto next_entry;
++	}
++	return 0;
++
++next_entry:
++	pcmcia_disable_device(p_dev);
++	return -ENODEV;
++};
++#endif
+ 
+ static int
+ orinoco_cs_config(struct pcmcia_device *link)
+@@ -138,10 +245,12 @@ orinoco_cs_config(struct pcmcia_device *
+ 	int ret;
+ 	void __iomem *mem;
+ 
++#if (LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,37))
+ 	link->config_flags |= CONF_AUTO_SET_VPP | CONF_AUTO_CHECK_VCC |
+ 		CONF_AUTO_SET_IO | CONF_ENABLE_IRQ;
+ 	if (ignore_cis_vcc)
+ 		link->config_flags &= ~CONF_AUTO_CHECK_VCC;
++#endif
+ 	ret = pcmcia_loop_config(link, orinoco_cs_config_check, NULL);
+ 	if (ret) {
+ 		if (!ignore_cis_vcc)
+@@ -151,8 +260,12 @@ orinoco_cs_config(struct pcmcia_device *
+ 		goto failed;
+ 	}
+ 
++#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,36)
+ 	mem = ioport_map(link->resource[0]->start,
+ 			resource_size(link->resource[0]));
++#else
++	mem = ioport_map(link->io.BasePort1, link->io.NumPorts1);
++#endif
+ 	if (!mem)
+ 		goto failed;
+ 
+@@ -161,7 +274,11 @@ orinoco_cs_config(struct pcmcia_device *
+ 	 * called. */
+ 	hermes_struct_init(hw, mem, HERMES_16BIT_REGSPACING);
+ 
++#if (LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,35))
+ 	ret = pcmcia_request_irq(link, orinoco_interrupt);
++#else
++	ret = pcmcia_request_irq(link, &link->irq);
++#endif
+ 	if (ret)
+ 		goto failed;
+ 
+@@ -176,8 +293,16 @@ orinoco_cs_config(struct pcmcia_device *
+ 	}
+ 
+ 	/* Register an interface with the stack */
++#if (LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,36))
+ 	if (orinoco_if_add(priv, link->resource[0]->start,
+ 			   link->irq, NULL) != 0) {
++#elif (LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,35))
++	if (orinoco_if_add(priv, link->io.BasePort1,
++			   link->irq, NULL) != 0) {
++#else
++	if (orinoco_if_add(priv, link->io.BasePort1,
++			   link->irq.AssignedIRQ, NULL) != 0) {
++#endif
+ 		printk(KERN_ERR PFX "orinoco_if_add() failed\n");
+ 		goto failed;
+ 	}
+@@ -331,7 +456,13 @@ MODULE_DEVICE_TABLE(pcmcia, orinoco_cs_i
+ 
+ static struct pcmcia_driver orinoco_driver = {
+ 	.owner		= THIS_MODULE,
++#if (LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,37))
+ 	.name		= DRIVER_NAME,
++#else
++	.drv		= {
++		.name	= DRIVER_NAME,
++	},
++#endif
+ 	.probe		= orinoco_cs_probe,
+ 	.remove		= orinoco_cs_detach,
+ 	.id_table       = orinoco_cs_ids,
+--- a/drivers/net/wireless/orinoco/spectrum_cs.c
++++ b/drivers/net/wireless/orinoco/spectrum_cs.c
+@@ -170,6 +170,16 @@ spectrum_cs_probe(struct pcmcia_device *
+ 	card->p_dev = link;
+ 	link->priv = priv;
+ 
++#if (LINUX_VERSION_CODE < KERNEL_VERSION(2,6,35))
++	/* Interrupt setup */
++	link->irq.Attributes = IRQ_TYPE_DYNAMIC_SHARING;
++	link->irq.Handler = orinoco_interrupt;
++#endif
++#if (LINUX_VERSION_CODE < KERNEL_VERSION(2,6,37))
++	link->conf.Attributes = 0;
++	link->conf.IntType = INT_MEMORY_AND_IO;
++#endif
++
+ 	return spectrum_cs_config(link);
+ }				/* spectrum_cs_attach */
+ 
+@@ -184,6 +194,7 @@ static void spectrum_cs_detach(struct pc
+ 	free_orinocodev(priv);
+ }				/* spectrum_cs_detach */
+ 
++#if (LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,37))
+ static int spectrum_cs_config_check(struct pcmcia_device *p_dev,
+ 				    void *priv_data)
+ {
+@@ -192,6 +203,98 @@ static int spectrum_cs_config_check(stru
+ 
+ 	return pcmcia_request_io(p_dev);
+ };
++#else
++static int spectrum_cs_config_check(struct pcmcia_device *p_dev,
++				    cistpl_cftable_entry_t *cfg,
++				    cistpl_cftable_entry_t *dflt,
++				    unsigned int vcc,
++				    void *priv_data)
++{
++	if (cfg->index == 0)
++		goto next_entry;
++
++	/* Use power settings for Vcc and Vpp if present */
++	/* Note that the CIS values need to be rescaled */
++	if (cfg->vcc.present & (1 << CISTPL_POWER_VNOM)) {
++		if (vcc != cfg->vcc.param[CISTPL_POWER_VNOM] / 10000) {
++			DEBUG(2, "%s: Vcc mismatch (vcc = %d, CIS = %d)\n",
++			      __func__, vcc,
++			      cfg->vcc.param[CISTPL_POWER_VNOM] / 10000);
++			if (!ignore_cis_vcc)
++				goto next_entry;
++		}
++	} else if (dflt->vcc.present & (1 << CISTPL_POWER_VNOM)) {
++		if (vcc != dflt->vcc.param[CISTPL_POWER_VNOM] / 10000) {
++			DEBUG(2, "%s: Vcc mismatch (vcc = %d, CIS = %d)\n",
++			      __func__, vcc,
++			      dflt->vcc.param[CISTPL_POWER_VNOM] / 10000);
++			if (!ignore_cis_vcc)
++				goto next_entry;
++		}
++	}
++
++	if (cfg->vpp1.present & (1 << CISTPL_POWER_VNOM))
++		p_dev->conf.Vpp =
++			cfg->vpp1.param[CISTPL_POWER_VNOM] / 10000;
++	else if (dflt->vpp1.present & (1 << CISTPL_POWER_VNOM))
++		p_dev->conf.Vpp =
++			dflt->vpp1.param[CISTPL_POWER_VNOM] / 10000;
++
++	/* Do we need to allocate an interrupt? */
++	p_dev->conf.Attributes |= CONF_ENABLE_IRQ;
++
++	/* IO window settings */
++#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,36)
++	p_dev->resource[0]->end = p_dev->resource[1]->end = 0;
++#else
++	p_dev->io.NumPorts1 = p_dev->io.NumPorts2 = 0;
++#endif
++	if ((cfg->io.nwin > 0) || (dflt->io.nwin > 0)) {
++		cistpl_io_t *io = (cfg->io.nwin) ? &cfg->io : &dflt->io;
++#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,36)
++		p_dev->io_lines = io->flags & CISTPL_IO_LINES_MASK;
++		p_dev->resource[0]->flags &= ~IO_DATA_PATH_WIDTH;
++		p_dev->resource[0]->flags |=
++			pcmcia_io_cfg_data_width(io->flags);
++		p_dev->resource[0]->start = io->win[0].base;
++		p_dev->resource[0]->end = io->win[0].len;
++#else
++		p_dev->io.Attributes1 = IO_DATA_PATH_WIDTH_AUTO;
++		if (!(io->flags & CISTPL_IO_8BIT))
++			p_dev->io.Attributes1 = IO_DATA_PATH_WIDTH_16;
++		if (!(io->flags & CISTPL_IO_16BIT))
++			p_dev->io.Attributes1 = IO_DATA_PATH_WIDTH_8;
++		p_dev->io.IOAddrLines = io->flags & CISTPL_IO_LINES_MASK;
++		p_dev->io.BasePort1 = io->win[0].base;
++		p_dev->io.NumPorts1 = io->win[0].len;
++#endif
++		if (io->nwin > 1) {
++#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,36)
++			p_dev->resource[1]->flags = p_dev->resource[0]->flags;
++			p_dev->resource[1]->start = io->win[1].base;
++			p_dev->resource[1]->end = io->win[1].len;
++#else
++			p_dev->io.Attributes2 = p_dev->io.Attributes1;
++			p_dev->io.BasePort2 = io->win[1].base;
++			p_dev->io.NumPorts2 = io->win[1].len;
++#endif
++		}
++
++		/* This reserves IO space but doesn't actually enable it */
++#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,36)
++		if (pcmcia_request_io(p_dev) != 0)
++#else
++		if (pcmcia_request_io(p_dev, &p_dev->io) != 0)
++#endif
++			goto next_entry;
++	}
++	return 0;
++
++next_entry:
++	pcmcia_disable_device(p_dev);
++	return -ENODEV;
++};
++#endif
+ 
+ static int
+ spectrum_cs_config(struct pcmcia_device *link)
+@@ -201,10 +304,12 @@ spectrum_cs_config(struct pcmcia_device
+ 	int ret;
+ 	void __iomem *mem;
+ 
++#if (LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,37))
+ 	link->config_flags |= CONF_AUTO_SET_VPP | CONF_AUTO_CHECK_VCC |
+ 		CONF_AUTO_SET_IO | CONF_ENABLE_IRQ;
+ 	if (ignore_cis_vcc)
+ 		link->config_flags &= ~CONF_AUTO_CHECK_VCC;
++#endif
+ 	ret = pcmcia_loop_config(link, spectrum_cs_config_check, NULL);
+ 	if (ret) {
+ 		if (!ignore_cis_vcc)
+@@ -214,8 +319,12 @@ spectrum_cs_config(struct pcmcia_device
+ 		goto failed;
+ 	}
+ 
++#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,36)
+ 	mem = ioport_map(link->resource[0]->start,
+ 			resource_size(link->resource[0]));
++#else
++	mem = ioport_map(link->io.BasePort1, link->io.NumPorts1);
++#endif
+ 	if (!mem)
+ 		goto failed;
+ 
+@@ -225,7 +334,11 @@ spectrum_cs_config(struct pcmcia_device
+ 	hermes_struct_init(hw, mem, HERMES_16BIT_REGSPACING);
+ 	hw->eeprom_pda = true;
+ 
++#if (LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,35))
+ 	ret = pcmcia_request_irq(link, orinoco_interrupt);
++#else
++	ret = pcmcia_request_irq(link, &link->irq);
++#endif
+ 	if (ret)
+ 		goto failed;
+ 
+@@ -244,8 +357,16 @@ spectrum_cs_config(struct pcmcia_device
+ 	}
+ 
+ 	/* Register an interface with the stack */
++#if (LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,36))
+ 	if (orinoco_if_add(priv, link->resource[0]->start,
+ 			   link->irq, NULL) != 0) {
++#elif (LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,35))
++	if (orinoco_if_add(priv, link->io.BasePort1,
++			   link->irq, NULL) != 0) {
++#else
++	if (orinoco_if_add(priv, link->io.BasePort1,
++			   link->irq.AssignedIRQ, NULL) != 0) {
++#endif
+ 		printk(KERN_ERR PFX "orinoco_if_add() failed\n");
+ 		goto failed;
+ 	}
+@@ -311,7 +432,13 @@ MODULE_DEVICE_TABLE(pcmcia, spectrum_cs_
+ 
+ static struct pcmcia_driver orinoco_driver = {
+ 	.owner		= THIS_MODULE,
++#if (LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,37))
+ 	.name		= DRIVER_NAME,
++#else
++	.drv		= {
++		.name	= DRIVER_NAME,
++	},
++#endif
+ 	.probe		= spectrum_cs_probe,
+ 	.remove		= spectrum_cs_detach,
+ 	.suspend	= spectrum_cs_suspend,
+--- a/drivers/ssb/main.c
++++ b/drivers/ssb/main.c
+@@ -504,7 +504,11 @@ static int ssb_devices_register(struct s
+ 			break;
+ 		case SSB_BUSTYPE_PCMCIA:
+ #ifdef CONFIG_SSB_PCMCIAHOST
++#if (LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,35))
+ 			sdev->irq = bus->host_pcmcia->irq;
++#else
++			sdev->irq = bus->host_pcmcia->irq.AssignedIRQ;
++#endif
+ 			dev->parent = &bus->host_pcmcia->dev;
+ #endif
+ 			break;
