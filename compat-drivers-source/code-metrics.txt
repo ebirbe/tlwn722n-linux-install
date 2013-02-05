@@ -1,0 +1,28 @@
+
+[36mcompat-drivers code metrics[00m
+
+[35m   1281367[00m - Total upstream lines of code being pulled
+
+   [01;33mnetwork[00m
+   ----------------------------------------
+[01;32m      3056[00m - backport code changes
+[01;32m      2563[00m - backport code additions
+[01;32m       493[00m - backport code deletions
+[01;32m     14702[00m - backport from compat module
+[01;32m     17758[00m - total backport code
+[31m    1.3859[00m - % of code consists of backport work
+
+   [01;33mdrm[00m
+   ----------------------------------------
+[01;32m       436[00m - backport code changes
+[01;32m       293[00m - backport code additions
+[01;32m       143[00m - backport code deletions
+[01;32m     14702[00m - backport from compat module
+[01;32m     15138[00m - total backport code
+[31m    1.1814[00m - % of code consists of backport work
+
+Base tree: [01;32mlinux-next.git[00m
+Base tree version: [35mnext-20130125[00m
+compat.git: [36mcompat-2013-01-25[00m
+compat-drivers release: [01;33mcompat-drivers-2013-01-25-1-g3e51785[00m
+Code metrics archive: [01;32mhttp://bit.ly/H6BTF7[00m

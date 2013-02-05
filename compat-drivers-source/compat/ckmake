@@ -1,0 +1,328 @@
+#!/usr/bin/env python
+
+# ncurses Linux kernel cross kernel compilation utility
+
+# Copyright (C) 2012 Luis R. Rodriguez <mcgrof@do-not-panic.com>
+#
+# This program is free software; you can redistribute it and/or modify
+# it under the terms of the GNU General Public License version 2 as
+# published by the Free Software Foundation.
+
+import locale
+import curses
+import time
+import os
+import re
+import random
+import tempfile
+import subprocess
+import sys
+import signal
+
+from Queue import *
+from threading import Thread, Lock
+from shutil import copytree, ignore_patterns, rmtree, copyfileobj
+from time import sleep
+
+releases_processed = []
+releases_baking = []
+processed_lock = Lock()
+baking_lock = Lock()
+my_cwd = os.getcwd()
+ckmake_return = 0
+
+tmp_path = my_cwd + "/.tmp.ckmake"
+ckmake_log = my_cwd + "/ckmake.log"
+ckmake_report = my_cwd + "/ckmake-report.log"
+
+home = os.getenv("HOME")
+ksrc = home + "/" + "compat-ksrc"
+modules = ksrc + "/lib/modules"
+
+def clean():
+	if os.path.exists(tmp_path):
+		rmtree(tmp_path)
+
+def get_processed_rel(i):
+	"Because... list.pop(i) didn't work to keep order..."
+	processed_lock.acquire()
+	for rel in releases_processed:
+		if (rel['idx'] == i):
+			processed_lock.release()
+			return rel
+	processed_lock.release()
+
+	baking_lock.acquire()
+	for rel in releases_baking:
+		if (rel['idx'] == i):
+			releases_baking.remove(rel)
+			baking_lock.release()
+			return rel
+	baking_lock.release()
+
+def get_status_name(status):
+	if (status == 0):
+		return 'OK'
+	elif (status == 130):
+		return 'TERM'
+	elif (status == 1234):
+		return 'INIT'
+	elif (status == -2):
+		return 'TERM'
+	else:
+		return 'FAIL'
+
+def get_stat_pos(status):
+	if (status == 0):
+		return 34
+	elif (status == 130):
+		return 33
+	elif (status == 1234):
+		return 33
+	elif (status == -2):
+		return 33
+	else:
+		return 33
+
+def get_status_color(status):
+	if (status == 0):
+		return curses.color_pair(1)
+	elif (status == 130):
+		return curses.color_pair(2)
+	elif (status == 1234):
+		return curses.color_pair(2)
+	elif (status == -2):
+		return curses.color_pair(2)
+	else:
+		return curses.color_pair(3)
+
+def print_report():
+	os.system("clear")
+	sys.stdout.write("\n\n\n")
+	sys.stdout.write("== ckmake-report.log ==\n\n")
+	report = open(ckmake_report, 'r+')
+	copyfileobj(report, sys.stdout)
+	report.close()
+
+def process_logs():
+	os.system('clear')
+	log = open(ckmake_log, 'w+')
+	report = open(ckmake_report, 'w+')
+	for i in range(0, len(releases_processed)):
+		rel = get_processed_rel(i)
+		rel_log = open(rel['log'], 'r+')
+		log.write(rel_log.read())
+		status = get_status_name(rel['status'])
+		rel_report = "%-4s%-20s[  %s  ]\n" % \
+			     ( rel['idx']+1, rel['version'], status)
+		report.write(rel_report)
+		if (rel['status'] != 0 and
+		    rel['status'] != 2):
+			ckmake_return = -1
+	report.close()
+	log.close()
+	print_report()
+
+def process_kernel(num, kset):
+	while True:
+		rel = kset.queue.get()
+		work_dir = tmp_path + '/' + rel['version']
+		copytree(my_cwd, \
+			 work_dir, \
+			 ignore=ignore_patterns('\.git*', '.tmp*', ".git"))
+		build = '%s/build/' % rel['full_path']
+		jobs = ' -j%d ' % kset.build_jobs
+		make_args = 'KLIB=%(build)s KLIB_BUILD=%(build)s' % \
+			    { "build": build }
+		log_file = work_dir + '/' + 'ckmake.n.log'
+		rel['log'] = log_file
+		# XXX: figure out how to properly address logging
+		# without this nasty ass hack.
+		log = ' > %(log)s 2>&1' % { "log": log_file }
+		nice = 'ionice -c 3 nice -n 20 '
+		cmd = nice + 'make ' + jobs + make_args + log
+
+		my_env = os.environ.copy()
+		my_env["KCFLAGS"] = "-Wno-unused-but-set-variable"
+
+		kset.baking(rel)
+
+		p = subprocess.Popen([cmd],
+				     env = my_env,
+				     cwd = work_dir,
+				     stdout=None,
+				     stderr=None,
+				     shell=True)
+		p.wait()
+
+		kset.update_status(rel, p.returncode)
+		kset.queue.task_done()
+		kset.completed(rel)
+
+def cpu_info_build_jobs():
+	if not os.path.exists('/proc/cpuinfo'):
+		return 1
+	f = open('/proc/cpuinfo', 'r')
+	max_cpus = 1
+	for line in f:
+		m = re.match(r"(?P<PROC>processor\s*:)\s*" \
+			     "(?P<NUM>\d+)",
+			     line)
+		if not m:
+			continue
+		proc_specs = m.groupdict()
+		if (proc_specs['NUM'] > max_cpus):
+			max_cpus = proc_specs['NUM']
+	return int(max_cpus) + 1
+
+def kill_curses():
+	curses.endwin()
+	sys.stdout = os.fdopen(0, 'w', 0)
+
+def sig_handler(signal, frame):
+	kill_curses()
+	process_logs()
+	clean()
+	sys.exit(-2)
+
+class kernel_set():
+	def __init__(self, stdscr):
+		self.queue = Queue()
+		self.releases = []
+		self.stdscr = stdscr
+		self.lock = Lock()
+		signal.signal(signal.SIGINT, sig_handler)
+		self.build_jobs = cpu_info_build_jobs()
+		if (curses.has_colors()):
+			curses.init_pair(1,
+					 curses.COLOR_GREEN,
+					 curses.COLOR_BLACK)
+			curses.init_pair(2,
+					 curses.COLOR_CYAN,
+					 curses.COLOR_BLACK)
+			curses.init_pair(3,
+					 curses.COLOR_RED,
+					 curses.COLOR_BLACK)
+			curses.init_pair(4,
+					 curses.COLOR_BLUE,
+					 curses.COLOR_BLACK)
+	def baking(self, rel):
+		baking_lock.acquire()
+		releases_baking.append(rel)
+		baking_lock.release()
+	def completed(self, rel):
+		processed_lock.acquire()
+		releases_processed.insert(rel['idx'], rel)
+		processed_lock.release()
+	def set_locale(self):
+		locale.setlocale(locale.LC_ALL, '')
+		code = locale.getpreferredencoding()
+	def refresh(self):
+		self.lock.acquire()
+		self.stdscr.refresh()
+		self.lock.release()
+	def parse_releases(self):
+		for dirname, dirnames, filenames in os.walk(modules):
+			dirnames.sort()
+			for subdirname in dirnames:
+				m = re.match(r"v*(?P<VERSION>\w+.)" \
+					     "(?P<PATCHLEVEL>\w+.*)" \
+					     "(?P<SUBLEVEL>\w*)" \
+					     "(?P<EXTRAVERSION>[.-]\w*)" \
+					     "(?P<RELMOD>[-]\w*).*", \
+					     subdirname)
+				if not m:
+					continue
+
+				specifics = m.groupdict()
+
+				ver = specifics['VERSION'] + \
+				      specifics['PATCHLEVEL'] + \
+				      specifics['SUBLEVEL']
+
+				for rel in self.releases:
+					if (rel['version'] == ver):
+						continue
+
+				rel = dict(idx=len(self.releases),
+					   name=subdirname,
+					   full_path=dirname + '/' +
+						     subdirname,
+					   version=ver,
+					   processed=False,
+					   log='',
+					   status=1234)
+				self.releases.insert(rel['idx'], rel)
+		self.refresh()
+	def setup_screen(self):
+		for i in range(0, len(self.releases)):
+			rel = self.releases[i]
+			self.lock.acquire()
+			self.stdscr.addstr(rel['idx'], 0,
+					   "%-4d" % (rel['idx']+1))
+			if (curses.has_colors()):
+				self.stdscr.addstr(rel['idx'], 5,
+						   "%-20s" % (rel['version']),
+						   curses.color_pair(4))
+			else:
+				self.stdscr.addstr(rel['idx'], 0,
+						   "%-20s" % (rel['version']))
+			self.stdscr.addstr(rel['idx'], 30, "[        ]")
+			self.stdscr.refresh()
+			self.lock.release()
+	def create_threads(self):
+		for rel in self.releases:
+			th = Thread(target=process_kernel, args=(0, self))
+			th.setDaemon(True)
+			th.start()
+	def kick_threads(self):
+		for rel in self.releases:
+			self.queue.put(rel)
+			sleep(1)
+	def wait_threads(self):
+		self.queue.join()
+	def update_status(self, rel, status):
+		self.lock.acquire()
+		stat_name = get_status_name(status)
+		stat_pos = get_stat_pos(status)
+		if (curses.has_colors()):
+			stat_color = get_status_color(status)
+			self.stdscr.addstr(rel['idx'], stat_pos, stat_name,
+					   get_status_color(status))
+		else:
+			self.stdscr.addstr(rel['idx'], stat_pos, stat_name)
+		rel['processed'] = True
+		rel['status'] = status
+		self.stdscr.refresh()
+		self.lock.release()
+
+def main(stdscr):
+	kset = kernel_set(stdscr)
+
+	kset.set_locale()
+	kset.parse_releases()
+	kset.setup_screen()
+	kset.create_threads()
+	kset.kick_threads()
+	kset.wait_threads()
+	kset.refresh()
+
+if __name__ == "__main__":
+	if not os.path.exists(modules):
+		print "%s does not exist" % (modules)
+		sys.exit(1)
+	if not os.path.exists(my_cwd + '/Makefile'):
+		print "%s does not exist" % (my_cwd + '/Makefile')
+		sys.exit(1)
+	if os.path.exists(ckmake_log):
+		os.remove(ckmake_log)
+	if os.path.exists(ckmake_report):
+		os.remove(ckmake_report)
+	if os.path.exists(tmp_path):
+		rmtree(tmp_path)
+	os.makedirs(tmp_path)
+	curses.wrapper(main)
+	kill_curses()
+	process_logs()
+	clean()
+	sys.exit(ckmake_return)
