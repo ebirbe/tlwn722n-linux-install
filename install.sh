@@ -29,7 +29,7 @@ MOD_DIR="/lib/modules/"$(uname -r)
 PWD=$( pwd )/
 SRC="source"
 
-CWSRC="compat-wireless-2012-05-10"
+CWSRC="compat-drivers-source"
 
 # Make sure only root can run our script
 if [[ $EUID -ne 0 ]]; then
