@@ -6,7 +6,7 @@
 # is enabled to be used. This allows us to choose any driver without 
 # blacklisting each other.
 
-. /usr/lib/compat-wireless/modlib.sh
+. /usr/lib/compat-drivers/modlib.sh
 
 if [[ $UID -ne 0 ]]; then
 	echo "Run with root privileges"

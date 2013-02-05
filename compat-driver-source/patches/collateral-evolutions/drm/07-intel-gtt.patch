@@ -1,0 +1,42 @@
+Kernels older than 3.6 don't have intel_enable_gtt() exported
+and most Linux distributions have CONFIG_AGP_INTEL as built-in
+(y) and as such we don't bother to make it available as
+modular here. The change to export intel_enable_gtt() was
+made through commit 8ecd1a66 but previous to this the driver
+never called intel_enable_gtt() so we can safely assume we
+can do the same for older kernels.
+
+There should be a way to export an intel_enable_gtt() for
+kernels with CONFIG_AGP_INTEL as built-in but that itself
+is a project.
+
+commit 8ecd1a6615f0d9de6759aafe229bc1cc4ee99c7b
+Author: Daniel Vetter <daniel.vetter@ffwll.ch>
+Date:   Thu Jun 7 15:56:03 2012 +0200
+
+    drm/i915: call intel_enable_gtt
+    
+    When drm/i915 is in control of the gtt, we need to call
+    the enable function at all the relevant places ourselves.
+    
+    Reviewed-by: Jani Nikula <jani.nikula@linux.intel.com>
+    Signed-off-by: Daniel Vetter <daniel.vetter@ffwll.ch>
+
+--- a/drivers/gpu/drm/i915/i915_gem.c
++++ b/drivers/gpu/drm/i915/i915_gem.c
+@@ -3954,9 +3954,14 @@ i915_gem_init_hw(struct drm_device *dev)
+ 	drm_i915_private_t *dev_priv = dev->dev_private;
+ 	int ret;
+ 
+-	if (INTEL_INFO(dev)->gen < 6 && !intel_enable_gtt())
++	if (INTEL_INFO(dev)->gen < 6)
+ 		return -EIO;
+ 
++#if (LINUX_VERSION_CODE >= KERNEL_VERSION(3,6,0))
++	if (!intel_enable_gtt())
++		return -EIO;
++#endif
++
+ 	if (IS_HASWELL(dev) && (I915_READ(0x120010) == 1))
+ 		I915_WRITE(0x9008, I915_READ(0x9008) | 0xf0000);
+ 

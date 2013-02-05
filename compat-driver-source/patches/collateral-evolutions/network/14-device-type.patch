@@ -1,0 +1,56 @@
+Kernels >= 2.6.32 can identify the type of device netdevice
+so that sysfs can be used to get this. We never really had a
+systematic way of doing this -- now we do through the
+SET_NETDEV_DEVTYPE() macro. For older kernels we make the
+SET_NETDEV_DEVTYPE() be a no-op this means the wireless type
+we define is unused so we ucomment it simply to avoid a
+compile warning.
+
+--- a/net/wireless/core.c
++++ b/net/wireless/core.c
+@@ -803,9 +803,11 @@ void cfg80211_unregister_wdev(struct wir
+ }
+ EXPORT_SYMBOL(cfg80211_unregister_wdev);
+ 
++#if (LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,32))
+ static struct device_type wiphy_type = {
+ 	.name	= "wlan",
+ };
++#endif
+ 
+ void cfg80211_update_iface_num(struct cfg80211_registered_device *rdev,
+ 			       enum nl80211_iftype iftype, int num)
+--- a/net/bluetooth/bnep/core.c
++++ b/net/bluetooth/bnep/core.c
+@@ -526,9 +526,11 @@ static struct device *bnep_get_device(st
+ 	return conn ? &conn->dev : NULL;
+ }
+ 
++#if (LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,32))
+ static struct device_type bnep_type = {
+ 	.name	= "bluetooth",
+ };
++#endif
+ 
+ int bnep_add_connection(struct bnep_connadd_req *req, struct socket *sock)
+ {
+--- a/drivers/net/usb/usbnet.c
++++ b/drivers/net/usb/usbnet.c
+@@ -1340,13 +1340,17 @@ static const struct net_device_ops usbne
+ 
+ // precondition: never called in_interrupt
+ 
++#if (LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,32))
+ static struct device_type wlan_type = {
+ 	.name	= "wlan",
+ };
++#endif
+ 
++#if (LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,32))
+ static struct device_type wwan_type = {
+ 	.name	= "wwan",
+ };
++#endif
+ 
+ int
+ usbnet_probe (struct usb_interface *udev, const struct usb_device_id *prod)

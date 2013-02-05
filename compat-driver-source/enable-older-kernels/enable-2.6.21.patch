@@ -5,10 +5,10 @@
  $(foreach ver,$(COMPAT_VERSIONS),$(eval CONFIG_COMPAT_KERNEL_3_$(ver)=y))
  
 -ifdef CONFIG_COMPAT_KERNEL_2_6_24
--$(error "ERROR: compat-wireless by default supports kernels >= 2.6.24, try enabling only one driver though")
+-$(error "ERROR: compat-drivers by default supports kernels >= 2.6.24, try enabling only one driver though")
 -endif #CONFIG_COMPAT_KERNEL_2_6_24
 +ifdef CONFIG_COMPAT_KERNEL_2_6_21
-+$(error "ERROR: compat-wireless by default supports kernels >= 2.6.21, try enabling only one driver though")
++$(error "ERROR: compat-drivers by default supports kernels >= 2.6.21, try enabling only one driver though")
 +endif #CONFIG_COMPAT_KERNEL_2_6_21
  
  ifeq ($(CONFIG_CFG80211),y)

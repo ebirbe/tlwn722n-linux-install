@@ -1,0 +1,23 @@
+The following patch makes use of the dismantle member in struct 
+net_device, this patch removes that access on older kernels.
+
+commit 9d5d496c3464b7ad0ba942b4ada5f27c07e07079
+Author: Daniel Drake <dsd@laptop.org>
+Date:   Mon Jul 30 22:58:04 2012 +0100
+
+    libertas: don't reset card on error when it is being removed
+
+--- a/drivers/net/wireless/libertas/main.c
++++ b/drivers/net/wireless/libertas/main.c
+@@ -592,7 +592,11 @@ static int lbs_thread(void *data)
+ 
+ 			/* Reset card, but only when it isn't in the process
+ 			 * of being shutdown anyway. */
++#if (LINUX_VERSION_CODE >= KERNEL_VERSION(3,0,0))
+ 			if (!dev->dismantle && priv->reset_card)
++#else
++			if (priv->reset_card)
++#endif
+ 				priv->reset_card(priv);
+ 		}
+ 		priv->cmd_timed_out = 0;

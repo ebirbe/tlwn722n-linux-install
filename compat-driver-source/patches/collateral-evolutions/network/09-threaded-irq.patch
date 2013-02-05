@@ -1,0 +1,129 @@
+The 2.6.31 kernel has threaded IRQ support and b43 is the first
+wireless driver that makes use of it. To support threaded IRSs
+on older kernels we built our own struct compat_threaded_irq
+to queue_work() onto it as the kernel thread be running the
+thread in process context as well.
+
+--- a/drivers/net/wireless/b43/main.c
++++ b/drivers/net/wireless/b43/main.c
+@@ -4240,8 +4240,13 @@ redo:
+ 	if (b43_bus_host_is_sdio(dev->dev)) {
+ 		b43_sdio_free_irq(dev);
+ 	} else {
++#if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,31)
++		compat_synchronize_threaded_irq(&dev->irq_compat);
++		compat_free_threaded_irq(&dev->irq_compat);
++#else
+ 		synchronize_irq(dev->dev->irq);
+ 		free_irq(dev->dev->irq, dev);
++#endif
+ 	}
+ 	mutex_lock(&wl->mutex);
+ 	dev = wl->current_dev;
+@@ -4287,9 +4292,17 @@ static int b43_wireless_core_start(struc
+ 			goto out;
+ 		}
+ 	} else {
++#if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,31)
++		err = compat_request_threaded_irq(&dev->irq_compat,
++						  dev->dev->irq,
++						  b43_interrupt_handler,
++						  b43_interrupt_thread_handler,
++						  IRQF_SHARED, KBUILD_MODNAME, dev);
++#else
+ 		err = request_threaded_irq(dev->dev->irq, b43_interrupt_handler,
+ 					   b43_interrupt_thread_handler,
+ 					   IRQF_SHARED, KBUILD_MODNAME, dev);
++#endif
+ 		if (err) {
+ 			b43err(dev->wl, "Cannot request IRQ-%d\n",
+ 			       dev->dev->irq);
+@@ -5112,6 +5125,10 @@ static int b43_setup_bands(struct b43_wl
+ 
+ static void b43_wireless_core_detach(struct b43_wldev *dev)
+ {
++#if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,31)
++	if (dev->dev->sdev->bus->bustype != SSB_BUSTYPE_SDIO)
++		compat_destroy_threaded_irq(&dev->irq_compat);
++#endif
+ 	/* We release firmware that late to not be required to re-request
+ 	 * is all the time when we reinit the core. */
+ 	b43_release_firmware(dev);
+--- a/drivers/net/wireless/b43/b43.h
++++ b/drivers/net/wireless/b43/b43.h
+@@ -864,6 +864,9 @@ struct b43_wldev {
+ 	unsigned int tx_count;
+ 	unsigned int rx_count;
+ #endif
++#if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,31)
++	struct compat_threaded_irq irq_compat;
++#endif
+ };
+ 
+ /* Data structure for the WLAN parts (802.11 cores) of the b43 chip. */
+--- a/drivers/net/wireless/ti/wlcore/main.c
++++ b/drivers/net/wireless/ti/wlcore/main.c
+@@ -5568,14 +5568,25 @@ static void wlcore_nvs_cb(const struct f
+ 	wl->set_power = pdata->set_power;
+ 	wl->if_ops = pdata->ops;
+ 
++#if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,32)
++	irqflags = IRQF_TRIGGER_RISING;
++#else
+ 	if (wl->platform_quirks & WL12XX_PLATFORM_QUIRK_EDGE_IRQ)
+ 		irqflags = IRQF_TRIGGER_RISING;
+ 	else
+ 		irqflags = IRQF_TRIGGER_HIGH | IRQF_ONESHOT;
++#endif
+ 
++#if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,31)
++	ret = compat_request_threaded_irq(&wl->irq_compat, wl->irq,
++					  wl12xx_hardirq, wlcore_irq,
++					  irqflags,
++					  pdev->name, wl);
++#else
+ 	ret = request_threaded_irq(wl->irq, wl12xx_hardirq, wlcore_irq,
+ 				   irqflags,
+ 				   pdev->name, wl);
++#endif
+ 	if (ret < 0) {
+ 		wl1271_error("request_irq() failed: %d", ret);
+ 		goto out_free_nvs;
+@@ -5650,7 +5661,11 @@ out_unreg:
+ 	wl1271_unregister_hw(wl);
+ 
+ out_irq:
++#if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,31)
++	compat_free_threaded_irq(&wl->irq_compat);
++#else
+ 	free_irq(wl->irq, wl);
++#endif
+ 
+ out_free_nvs:
+ 	kfree(wl->nvs);
+@@ -5696,7 +5711,12 @@ int wlcore_remove(struct platform_device
+ 		disable_irq_wake(wl->irq);
+ 	}
+ 	wl1271_unregister_hw(wl);
++#if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,31)
++	compat_free_threaded_irq(&wl->irq_compat);
++	compat_destroy_threaded_irq(&wl->irq_compat);
++#else
+ 	free_irq(wl->irq, wl);
++#endif
+ 	wlcore_free_hw(wl);
+ 
+ 	return 0;
+--- a/drivers/net/wireless/ti/wlcore/wlcore.h
++++ b/drivers/net/wireless/ti/wlcore/wlcore.h
+@@ -149,7 +149,9 @@ struct wl1271 {
+ 	bool initialized;
+ 	struct ieee80211_hw *hw;
+ 	bool mac80211_registered;
+-
++#if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,31)
++	struct compat_threaded_irq irq_compat;
++#endif
+ 	struct device *dev;
+ 	struct platform_device *pdev;
+ 

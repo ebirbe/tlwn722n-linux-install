@@ -1,0 +1,129 @@
+#!/bin/bash
+#
+# git-paranoia: for those parnaoid about what goes into releases based on git.
+#
+# Copyright 2012  Luis R. Rodriguez <mcgrof@do-not-panic.com>
+#
+# This program is free software; you can redistribute it and/or modify it
+# under the terms of the GNU General Public License as published by the Free
+# Software Foundation; either version 2 of the License, or (at your option)
+# any later version.
+#
+# This program is distributed in the hope that it will be useful, but WITHOUT
+# ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+# FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
+# more details.
+#
+# You should have received a copy of the GNU General Public License along with
+# this program; if not, write to the Free Software Foundation, Inc., 59
+# Temple Place - Suite 330, Boston, MA  02111-1307, USA.
+
+# Pretty colors
+GREEN="\033[01;32m"
+YELLOW="\033[01;33m"
+NORMAL="\033[00m"
+BLUE="\033[34m"
+RED="\033[31m"
+PURPLE="\033[35m"
+CYAN="\033[36m"
+UNDERLINE="\033[02m"
+
+INTERACTIVE="0"
+RUN_CLEAN="0"
+
+function usage()
+{
+	echo -e "Usage: ${GREEN}$1${NORMAL} ${BLUE}[ -i ]${NORMAL}"
+	echo -e "-i\tInteractive, allows user to override paranoia"
+	echo -e "-c\tRuns git clean -x -d for you. Not for the faint of heart"
+	echo
+	echo -e "Example usage:"
+	echo
+	echo -e "export GIT_DIRS=\"${HOME}/linux-stable/ ${HOME}/linux-next\""
+	echo -e "$1"
+	echo
+	exit
+}
+
+function __git_paranoia()
+{
+        for i in $GIT_DIRS; do
+		if [[ ! -d $i ]]; then
+			echo -e "${BLUE}$i${NORMAL} does not exist"
+			return 1
+		fi
+
+                cd $i;
+
+		if [[ "$RUN_CLEAN" = "1" ]]; then
+				git clean -x -d -f
+		fi
+
+                printf "Verifying ${BLUE}%15s\t${CYAN}%40s\t" $(basename $i) $(git describe)
+                git tag -v $(git describe --dirty) > /dev/null 2>&1
+                if [[ $? -ne 0 || $(git status -s | wc -l) -ne 0 ]]; then
+                        echo -e "[${RED}FAILED${NORMAL}]"
+			# We're paranoid, not only do we want the git tag to be GPG signed
+			# but we also want *no* unepxected content on the releases! If you have
+			# any files that do not belong into the git tree, nuke them, we won't do it
+			# for you!
+			if [[ $(git status -s | wc -l) -ne 0 || $(git clean -x -d -n | wc -l) -ne 0 ]]; then
+				echo -e "Detected some content which likely should not be released."
+				echo -e "In order to fix either run 'git clean -x -d -f' yourself or"
+				echo -e "run '$0 -c'"
+				echo -e ""
+				echo -e "Not commited content: (run: git clean -x -d -f to fix)"
+				git status -s
+				git clean -x -d -n | sed 's|^Would|Should|g'
+			fi
+			return 1
+                else
+                        echo -e "[${GREEN}OK!${NORMAL}]"
+                fi
+        done
+}
+
+if [[ -z $GIT_DIRS ]]; then
+	GIT_DIRS="${PWD}"
+	STAT="$(git status > /dev/null 2>&1 && echo $?)"
+	if [[ $STAT -ne 0 ]]; then
+		echo -e "${RED}Error${NORMAL}:"
+		echo -e "${PWD} not a git tree. Jump into one or set the "
+		echo -e "${CYAN}GIT_DIRS${NORMAL} environment variable with your list of git trees"
+		echo
+		usage $0
+		exit 1
+	fi
+fi
+
+while [ $# -ne 0 ]; do
+	if [[ "$1" = "-i" ]]; then
+		INTERACTIVE="1"
+                shift; continue;
+        fi
+	if [[ "$1" = "-c" ]]; then
+		RUN_CLEAN="1"
+                shift; continue;
+        fi
+        echo -e "Unexpected argument passed: ${RED}${1}${NORMAL}"
+        usage $0
+        exit
+done
+
+__git_paranoia
+
+if [[ $? -ne 0 ]]; then
+	echo
+        echo -e "Detected some tree content is not yet ${RED}GPG signed${NORMAL}..."
+	if [[ "$INTERACTIVE" = "0" ]]; then
+		exit 1
+	fi
+
+	read -p "Do you still want to continue (y/N)? "
+	if [[ "${REPLY}" != "y" ]]; then
+	    echo -e "Bailing out !"
+	    exit 1
+	fi
+fi
+
+exit 0

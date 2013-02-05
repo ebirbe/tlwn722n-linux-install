@@ -1,0 +1,9 @@
+Once upstream this will not be required.
+
+--- a/drivers/net/ethernet/atheros/Makefile
++++ b/drivers/net/ethernet/atheros/Makefile
+@@ -6,3 +6,4 @@ obj-$(CONFIG_ATL1) += atlx/
+ obj-$(CONFIG_ATL2) += atlx/
+ obj-$(CONFIG_ATL1E) += atl1e/
+ obj-$(CONFIG_ATL1C) += atl1c/
++obj-$(CONFIG_ALX) += alx/

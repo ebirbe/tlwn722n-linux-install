@@ -1,0 +1,26 @@
+USB opt soft_unbid was added as of 2.6.27.
+
+--- a/drivers/net/wireless/p54/p54usb.c
++++ b/drivers/net/wireless/p54/p54usb.c
+@@ -1143,7 +1143,9 @@ static struct usb_driver p54u_driver = {
+ 	.resume = p54u_resume,
+ 	.reset_resume = p54u_resume,
+ #endif /* CONFIG_PM */
++#if (LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,27))
+ 	.soft_unbind = 1,
++#endif
+ 	.disable_hub_initiated_lpm = 1,
+ };
+ 
+--- a/drivers/net/wireless/ath/ath9k/hif_usb.c
++++ b/drivers/net/wireless/ath/ath9k/hif_usb.c
+@@ -1370,7 +1370,9 @@ static struct usb_driver ath9k_hif_usb_d
+ 	.reset_resume = ath9k_hif_usb_resume,
+ #endif
+ 	.id_table = ath9k_hif_usb_ids,
++#if (LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,27))
+ 	.soft_unbind = 1,
++#endif
+ 	.disable_hub_initiated_lpm = 1,
+ };
+ 

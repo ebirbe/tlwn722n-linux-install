@@ -1,0 +1,29 @@
+The UAPI changes split up the kernel and userspace API
+headers into separate directories. We provide backport
+support for the new rfkill module to kernels older than
+2.6.31. To allow us to dynamically provide only backport
+support for those kernels we have a trick within compat
+to provide its own include/linux/rfkill.h header which
+then will include either your own kernel's rkfill.h or
+include the one we are taking from linux-next. The one
+we take from linux-next is renamed to rfkill_backport.h.
+In order to allow the call to include your own kernel's
+rfkill.h the compat rfkill.h uses include_next. The UAPI
+changes would mean though that instead of getting your
+own kernel's rfkill.h you'd end up getting the UAPI
+header file. Fix this by ensuring that for new kernels
+we linux_next into the user's kernels rfkill.h and if
+the kernel is old we still to the rfkill_backport.h
+naming scheme.
+
+--- a/include/linux/rfkill_backport.h
++++ b/include/linux/rfkill_backport.h
+@@ -18,7 +18,7 @@
+ #ifndef __RFKILL_H
+ #define __RFKILL_H
+ 
+-#include <uapi/linux/rfkill.h>
++#include <uapi/linux/rfkill_backport.h>
+ 
+ /* don't allow anyone to use these in the kernel */
+ enum rfkill_user_states {

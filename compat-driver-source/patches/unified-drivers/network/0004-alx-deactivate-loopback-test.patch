@@ -1,0 +1,25 @@
+--- a/drivers/net/ethernet/atheros/alx/alx_ethtool.c
++++ b/drivers/net/ethernet/atheros/alx/alx_ethtool.c
+@@ -1687,7 +1687,9 @@ static void alx_self_test(struct net_dev
+ {
+ 	struct alx_adapter *adpt = netdev_priv(netdev);
+ 	bool if_running = netif_running(netdev);
++#if (LINUX_VERSION_CODE >= KERNEL_VERSION(3,1,0))
+ 	bool phy_lpback = etest->flags & ETH_TEST_FL_EXTERNAL_LB;
++#endif
+ 
+ 	ALX_FLAG_SET(adpt, TESTING);
+ 	memset(data, 0, sizeof(u64) * ALX_TEST_LEN);
+@@ -1707,10 +1709,12 @@ static void alx_self_test(struct net_dev
+ 		if (alx_diag_interrupt(adpt, &data[2]))
+ 			etest->flags |= ETH_TEST_FL_FAILED;
+ 
++#if (LINUX_VERSION_CODE >= KERNEL_VERSION(3,1,0))
+ 		if (phy_lpback)
+ 			etest->flags |= ETH_TEST_FL_EXTERNAL_LB_DONE;
+ 		if (alx_diag_loopback(adpt, &data[3], phy_lpback))
+ 			etest->flags |= ETH_TEST_FL_FAILED;
++#endif
+ 
+ 	} else {
+ 		netif_info(adpt, hw, adpt->netdev,  "online test start...\n");

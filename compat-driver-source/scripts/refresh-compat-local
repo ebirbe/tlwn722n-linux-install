@@ -1,6 +1,6 @@
 #!/bin/bash
 #
-# Copyright 2012    Luis R. Rodriguez <mcgrof@frijolero.org>
+# Copyright 2012    Luis R. Rodriguez <mcgrof@do-not-panic.com>
 #
 # Permission to use, copy, modify, and/or distribute this software for any
 # purpose with or without fee is hereby granted, provided that the above
@@ -21,8 +21,8 @@ source .compat_copy
 UPDATE_SCRIPT="$COMPAT_SRC/scripts/refresh-compat"
 
 if [[ ! -d $COMPAT_SRC ]]; then
-	echo -e "You should have compat-wireless.git cloned and checked out under $COMPAT_SRC"
-	echo -e "The git tree: git://github.com/mcgrof/compat-wireless.git"
+	echo -e "You should have compat-drivers.git cloned and checked out under $COMPAT_SRC"
+	echo -e "The git tree: git://github.com/mcgrof/compat-drivers"
 	exit 1
 fi
 

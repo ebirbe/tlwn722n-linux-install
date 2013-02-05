@@ -3,7 +3,7 @@
 #
 # Loads new Intel iwl (iwlagn) or the old ones (iwl4965)
 
-. /usr/lib/compat-wireless/modlib.sh
+. /usr/lib/compat-drivers/modlib.sh
 
 IWL_OLD="iwl4965"
 IWL_NEW="iwlagn"

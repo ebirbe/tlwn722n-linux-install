@@ -1,0 +1,94 @@
+vm_mmap() and vm_munmap() were introduced in kernels >= 3.4.0. Revert
+those changes for versions older than that.
+
+These can't be backported as they rely on non-exported symbols.
+
+--- a/drivers/gpu/drm/drm_bufs.c
++++ b/drivers/gpu/drm/drm_bufs.c
+@@ -1541,6 +1541,20 @@ int drm_mapbufs(struct drm_device *dev,
+ 				retcode = -EINVAL;
+ 				goto done;
+ 			}
++#if (LINUX_VERSION_CODE < KERNEL_VERSION(3,4,0))
++			down_write(&current->mm->mmap_sem);
++			virtual = do_mmap(file_priv->filp, 0, map->size,
++					  PROT_READ | PROT_WRITE,
++					  MAP_SHARED,
++					  token);
++			up_write(&current->mm->mmap_sem);
++		} else {
++			down_write(&current->mm->mmap_sem);
++			virtual = do_mmap(file_priv->filp, 0, dma->byte_count,
++					  PROT_READ | PROT_WRITE,
++					  MAP_SHARED, 0);
++			up_write(&current->mm->mmap_sem);
++#else
+ 			virtual = vm_mmap(file_priv->filp, 0, map->size,
+ 					  PROT_READ | PROT_WRITE,
+ 					  MAP_SHARED,
+@@ -1549,6 +1563,7 @@ int drm_mapbufs(struct drm_device *dev,
+ 			virtual = vm_mmap(file_priv->filp, 0, dma->byte_count,
+ 					  PROT_READ | PROT_WRITE,
+ 					  MAP_SHARED, 0);
++#endif
+ 		}
+ 		if (virtual > -1024UL) {
+ 			/* Real error */
+--- a/drivers/gpu/drm/i810/i810_dma.c
++++ b/drivers/gpu/drm/i810/i810_dma.c
+@@ -135,9 +135,17 @@ static int i810_map_buffer(struct drm_bu
+ 	old_fops = file_priv->filp->f_op;
+ 	file_priv->filp->f_op = &i810_buffer_fops;
+ 	dev_priv->mmap_buffer = buf;
++#if (LINUX_VERSION_CODE < KERNEL_VERSION(3,4,0))
++	down_write(&current->mm->mmap_sem);
++	buf_priv->virtual = (void *)do_mmap(file_priv->filp, 0, buf->total,
++					    PROT_READ | PROT_WRITE,
++					    MAP_SHARED, buf->bus_address);
++	up_write(&current->mm->mmap_sem);
++#else
+ 	buf_priv->virtual = (void *)vm_mmap(file_priv->filp, 0, buf->total,
+ 					    PROT_READ | PROT_WRITE,
+ 					    MAP_SHARED, buf->bus_address);
++#endif
+ 	dev_priv->mmap_buffer = NULL;
+ 	file_priv->filp->f_op = old_fops;
+ 	if (IS_ERR(buf_priv->virtual)) {
+@@ -158,9 +166,15 @@ static int i810_unmap_buffer(struct drm_
+ 	if (buf_priv->currently_mapped != I810_BUF_MAPPED)
+ 		return -EINVAL;
+ 
++#if (LINUX_VERSION_CODE < KERNEL_VERSION(3,4,0))
++	down_write(&current->mm->mmap_sem);
++	retcode = do_munmap(current->mm, (unsigned long)buf_priv->virtual,
++			    (size_t) buf->total);
++	up_write(&current->mm->mmap_sem);
++#else
+ 	retcode = vm_munmap((unsigned long)buf_priv->virtual,
+ 			    (size_t) buf->total);
+-
++#endif
+ 	buf_priv->currently_mapped = I810_BUF_UNMAPPED;
+ 	buf_priv->virtual = NULL;
+ 
+--- a/drivers/gpu/drm/i915/i915_gem.c
++++ b/drivers/gpu/drm/i915/i915_gem.c
+@@ -1292,10 +1292,17 @@ i915_gem_mmap_ioctl(struct drm_device *d
+ 		drm_gem_object_unreference_unlocked(obj);
+ 		return -EINVAL;
+ 	}
+-
++#if (LINUX_VERSION_CODE < KERNEL_VERSION(3,4,0))
++	down_write(&current->mm->mmap_sem);
++	addr = do_mmap(obj->filp, 0, args->size,
++		       PROT_READ | PROT_WRITE, MAP_SHARED,
++		       args->offset);
++	up_write(&current->mm->mmap_sem);
++#else
+ 	addr = vm_mmap(obj->filp, 0, args->size,
+ 		       PROT_READ | PROT_WRITE, MAP_SHARED,
+ 		       args->offset);
++#endif
+ 	drm_gem_object_unreference_unlocked(obj);
+ 	if (IS_ERR((void *)addr))
+ 		return addr;

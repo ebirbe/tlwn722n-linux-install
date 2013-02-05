@@ -3,7 +3,7 @@
 #
 # Loads new broadcom drivers (b43 and b43legacy) or the old ones (bcm43xx)
 
-. /usr/lib/compat-wireless/modlib.sh
+. /usr/lib/compat-drivers/modlib.sh
 
 if [[ $UID -ne 0 ]]; then
 	echo "Run with root privileges"

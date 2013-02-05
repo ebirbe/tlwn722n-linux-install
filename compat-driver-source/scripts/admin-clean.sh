@@ -7,9 +7,8 @@ rm -rf drivers
 rm -rf include
 rm -rf compat
 rm -rf udev
-rm -f master-tag
 rm -f .compat_base_tree
 rm -f .compat_base_tree_version
 rm -f .compat_version
 rm -f code-metrics.txt
-echo "Cleaned wireless-bt-compat-2.6"
+echo "Cleaned compat-drivers"

@@ -1,0 +1,8 @@
+--- a/drivers/net/wireless/ath/wil6210/Makefile
++++ b/drivers/net/wireless/ath/wil6210/Makefile
+@@ -9,5 +9,4 @@ wil6210-objs += wmi.o
+ wil6210-objs += interrupt.o
+ wil6210-objs += txrx.o
+ 
+-subdir-ccflags-y += -Werror
+ subdir-ccflags-y += -D__CHECK_ENDIAN__

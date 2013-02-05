@@ -3,7 +3,7 @@
 #
 # Loads ath5k or madwifi
 
-. /usr/lib/compat-wireless/modlib.sh
+. /usr/lib/compat-drivers/modlib.sh
 
 if [[ $UID -ne 0 ]]; then
 	echo "Run with root privileges"

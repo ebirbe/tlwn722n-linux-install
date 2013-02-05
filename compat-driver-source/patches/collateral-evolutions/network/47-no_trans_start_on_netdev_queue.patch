@@ -1,0 +1,17 @@
+The struct netdev_queue does not have the attribute trans_start in
+kernel < 2.6.31. trans_start on struct net_device does the same
+on older kernels.
+
+--- a/drivers/net/wireless/mwifiex/init.c
++++ b/drivers/net/wireless/mwifiex/init.c
+@@ -375,8 +375,10 @@ void mwifiex_set_trans_start(struct net_
+ {
+ 	int i;
+ 
++#if (LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,31))
+ 	for (i = 0; i < dev->num_tx_queues; i++)
+ 		netdev_get_tx_queue(dev, i)->trans_start = jiffies;
++#endif
+ 
+ 	dev->trans_start = jiffies;
+ }

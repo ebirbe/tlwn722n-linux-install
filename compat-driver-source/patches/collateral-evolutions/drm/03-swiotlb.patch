@@ -1,0 +1,83 @@
+
+swiotlb_nr_tbl() was available since 3.2 but was exported since 3.3.
+Since it uses an internal global state variable, it is impossible
+to backport it to compat.git. So revert the changes.
+
+--- a/drivers/gpu/drm/nouveau/nouveau_bo.c
++++ b/drivers/gpu/drm/nouveau/nouveau_bo.c
+@@ -1373,11 +1373,13 @@ nouveau_ttm_tt_populate(struct ttm_tt *t
+ 	}
+ #endif
+ 
++#if (LINUX_VERSION_CODE >= KERNEL_VERSION(3,3,0))
+ #ifdef CONFIG_SWIOTLB
+ 	if (swiotlb_nr_tbl()) {
+ 		return ttm_dma_populate((void *)ttm, dev->dev);
+ 	}
+ #endif
++#endif
+ 
+ 	r = ttm_pool_populate(ttm);
+ 	if (r) {
+@@ -1423,12 +1425,14 @@ nouveau_ttm_tt_unpopulate(struct ttm_tt
+ 	}
+ #endif
+ 
++#if (LINUX_VERSION_CODE >= KERNEL_VERSION(3,3,0))
+ #ifdef CONFIG_SWIOTLB
+ 	if (swiotlb_nr_tbl()) {
+ 		ttm_dma_unpopulate((void *)ttm, dev->dev);
+ 		return;
+ 	}
+ #endif
++#endif
+ 
+ 	for (i = 0; i < ttm->num_pages; i++) {
+ 		if (ttm_dma->dma_address[i]) {
+--- a/drivers/gpu/drm/radeon/radeon_ttm.c
++++ b/drivers/gpu/drm/radeon/radeon_ttm.c
+@@ -602,11 +602,13 @@ static int radeon_ttm_tt_populate(struct
+ 	}
+ #endif
+ 
++#if (LINUX_VERSION_CODE >= KERNEL_VERSION(3,3,0))
+ #ifdef CONFIG_SWIOTLB
+ 	if (swiotlb_nr_tbl()) {
+ 		return ttm_dma_populate(&gtt->ttm, rdev->dev);
+ 	}
+ #endif
++#endif
+ 
+ 	r = ttm_pool_populate(ttm);
+ 	if (r) {
+@@ -648,12 +650,14 @@ static void radeon_ttm_tt_unpopulate(str
+ 	}
+ #endif
+ 
++#if (LINUX_VERSION_CODE >= KERNEL_VERSION(3,3,0))
+ #ifdef CONFIG_SWIOTLB
+ 	if (swiotlb_nr_tbl()) {
+ 		ttm_dma_unpopulate(&gtt->ttm, rdev->dev);
+ 		return;
+ 	}
+ #endif
++#endif
+ 
+ 	for (i = 0; i < ttm->num_pages; i++) {
+ 		if (gtt->ttm.dma_address[i]) {
+@@ -876,6 +880,7 @@ static int radeon_ttm_debugfs_init(struc
+ 	radeon_mem_types_list[i].show = &ttm_page_alloc_debugfs;
+ 	radeon_mem_types_list[i].driver_features = 0;
+ 	radeon_mem_types_list[i++].data = NULL;
++#if (LINUX_VERSION_CODE >= KERNEL_VERSION(3,3,0))
+ #ifdef CONFIG_SWIOTLB
+ 	if (swiotlb_nr_tbl()) {
+ 		sprintf(radeon_mem_types_names[i], "ttm_dma_page_pool");
+@@ -885,6 +890,7 @@ static int radeon_ttm_debugfs_init(struc
+ 		radeon_mem_types_list[i++].data = NULL;
+ 	}
+ #endif
++#endif
+ 	return radeon_debugfs_add_files(rdev, radeon_mem_types_list, i);
+ 
+ #endif

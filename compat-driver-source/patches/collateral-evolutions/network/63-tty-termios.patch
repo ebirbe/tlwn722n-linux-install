@@ -1,0 +1,49 @@
+This patch requires a manual backport:
+
+commit adc8d746caa67fff4b53ba3e5163a6cbacc3b523
+Author: Alan Cox <alan@linux.intel.com>
+Date:   Sat Jul 14 15:31:47 2012 +0100
+
+    tty: move the termios object into the tty
+    
+    This will let us sort out a whole pile of tty related races. The
+    alternative would be to keep points and refcount the termios objects.
+    However
+    1. They are tiny anyway
+    2. Many devices don't use the stored copies
+    3. We can remove a pty special case
+    
+    Signed-off-by: Alan Cox <alan@linux.intel.com>
+    Signed-off-by: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+
+We cannot use compat.git for this given that the assignment
+was not done through a static inline helper.
+
+--- a/drivers/bluetooth/hci_ath.c
++++ b/drivers/bluetooth/hci_ath.c
+@@ -58,7 +58,11 @@ static int ath_wakeup_ar3k(struct tty_st
+ 		return status;
+ 
+ 	/* Disable Automatic RTSCTS */
++#if (LINUX_VERSION_CODE >= KERNEL_VERSION(3,7,0))
+ 	ktermios = tty->termios;
++#else
++	memcpy(&ktermios, tty->termios, sizeof(ktermios));
++#endif
+ 	ktermios.c_cflag &= ~CRTSCTS;
+ 	tty_set_termios(tty, &ktermios);
+ 
+--- a/net/bluetooth/rfcomm/tty.c
++++ b/net/bluetooth/rfcomm/tty.c
+@@ -868,7 +868,11 @@ static int rfcomm_tty_ioctl(struct tty_s
+ 
+ static void rfcomm_tty_set_termios(struct tty_struct *tty, struct ktermios *old)
+ {
++#if (LINUX_VERSION_CODE >= KERNEL_VERSION(3,7,0))
+ 	struct ktermios *new = &tty->termios;
++#else
++	struct ktermios *new = tty->termios;
++#endif
+ 	int old_baud_rate = tty_termios_baud_rate(old);
+ 	int new_baud_rate = tty_termios_baud_rate(new);
+ 

@@ -7,9 +7,9 @@
 # Seems Mandriva has an $DEPMOD_DIR but it doesn't have any files,
 # so lets deal with those distributions.
 DEPMOD_CONF="/etc/depmod.conf"
-DEPMOD_CONF_TMP="$DEPMOD_CONF.compat-wireless.old"
+DEPMOD_CONF_TMP="$DEPMOD_CONF.compat-drivers.old"
 DEPMOD_DIR="/etc/depmod.d/"
-COMPAT_DEPMOD_FILE=compat-wireless.conf
+COMPAT_DEPMOD_FILE=compat-drivers.conf
 GREP_REGEX_UPDATES="^[[:space:]]*search.*[[:space:]]updates\([[:space:]]\|$\)"
 GREP_REGEX_SEARCH="^[[:space:]]*search[[:space:]].\+$"
 DEPMOD_CMD="depmod"

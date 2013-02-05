@@ -1,0 +1,24 @@
+We can't possibly backport the wifi TX status since
+skb_shinfo()->tx_flags used to be a union and there
+is no way to make the & work properly in that case.
+So we need to just ifdef this part out.
+
+
+--- a/net/mac80211/tx.c
++++ b/net/mac80211/tx.c
+@@ -1992,6 +1992,7 @@ netdev_tx_t ieee80211_subif_start_xmit(s
+ 		goto fail_rcu;
+ 	}
+ 
++#if (LINUX_VERSION_CODE >= KERNEL_VERSION(3,3,0))
+ 	if (unlikely(!multicast && skb->sk &&
+ 		     skb_shinfo(skb)->tx_flags & SKBTX_WIFI_STATUS)) {
+ 		struct sk_buff *orig_skb = skb;
+@@ -2030,6 +2031,7 @@ netdev_tx_t ieee80211_subif_start_xmit(s
+ 			skb = orig_skb;
+ 		}
+ 	}
++#endif
+ 
+ 	/*
+ 	 * If the skb is shared we need to obtain our own copy.

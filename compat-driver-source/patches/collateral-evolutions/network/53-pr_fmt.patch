@@ -1,0 +1,715 @@
+This is the correct way to use pr_fmt. This helps avoid
+compiler warnings. This is going to be sent upstream.
+
+--- a/drivers/bcma/bcma_private.h
++++ b/drivers/bcma/bcma_private.h
+@@ -1,10 +1,10 @@
+ #ifndef LINUX_BCMA_PRIVATE_H_
+ #define LINUX_BCMA_PRIVATE_H_
+ 
+-#ifndef pr_fmt
++#undef pr_fmt
+ #define pr_fmt(fmt)		KBUILD_MODNAME ": " fmt
+-#endif
+ 
++#include <linux/printk.h>
+ #include <linux/bcma/bcma.h>
+ #include <linux/delay.h>
+ 
+--- a/drivers/net/ethernet/broadcom/b44.c
++++ b/drivers/net/ethernet/broadcom/b44.c
+@@ -10,9 +10,11 @@
+  * Distribute under GPL.
+  */
+ 
++#undef pr_fmt
+ #define pr_fmt(fmt) KBUILD_MODNAME ": " fmt
+ 
+ #include <linux/kernel.h>
++#include <linux/printk.h>
+ #include <linux/module.h>
+ #include <linux/moduleparam.h>
+ #include <linux/types.h>
+--- a/drivers/net/wireless/iwlegacy/3945-mac.c
++++ b/drivers/net/wireless/iwlegacy/3945-mac.c
+@@ -27,9 +27,11 @@
+  *
+  *****************************************************************************/
+ 
++#undef pr_fmt
+ #define pr_fmt(fmt) KBUILD_MODNAME ": " fmt
+ 
+ #include <linux/kernel.h>
++#include <linux/printk.h>
+ #include <linux/module.h>
+ #include <linux/init.h>
+ #include <linux/pci.h>
+--- a/drivers/net/wireless/iwlegacy/4965-mac.c
++++ b/drivers/net/wireless/iwlegacy/4965-mac.c
+@@ -27,9 +27,11 @@
+  *
+  *****************************************************************************/
+ 
++#undef pr_fmt
+ #define pr_fmt(fmt) KBUILD_MODNAME ": " fmt
+ 
+ #include <linux/kernel.h>
++#include <linux/printk.h>
+ #include <linux/module.h>
+ #include <linux/init.h>
+ #include <linux/pci.h>
+--- a/drivers/net/wireless/libertas/cfg.c
++++ b/drivers/net/wireless/libertas/cfg.c
+@@ -6,8 +6,10 @@
+  *
+  */
+ 
++#undef pr_fmt
+ #define pr_fmt(fmt) KBUILD_MODNAME ": " fmt
+ 
++#include <linux/printk.h>
+ #include <linux/hardirq.h>
+ #include <linux/sched.h>
+ #include <linux/wait.h>
+--- a/drivers/net/wireless/libertas/if_usb.c
++++ b/drivers/net/wireless/libertas/if_usb.c
+@@ -2,8 +2,10 @@
+  * This file contains functions used in USB interface module.
+  */
+ 
++#undef pr_fmt
+ #define pr_fmt(fmt) KBUILD_MODNAME ": " fmt
+ 
++#include <linux/printk.h>
+ #include <linux/delay.h>
+ #include <linux/module.h>
+ #include <linux/firmware.h>
+--- a/drivers/net/wireless/libertas/if_sdio.c
++++ b/drivers/net/wireless/libertas/if_sdio.c
+@@ -26,9 +26,11 @@
+  * if_sdio_card_to_host() to pad the data.
+  */
+ 
++#undef pr_fmt
+ #define pr_fmt(fmt) KBUILD_MODNAME ": " fmt
+ 
+ #include <linux/kernel.h>
++#include <linux/printk.h>
+ #include <linux/module.h>
+ #include <linux/slab.h>
+ #include <linux/firmware.h>
+--- a/drivers/net/wireless/libertas/if_spi.c
++++ b/drivers/net/wireless/libertas/if_spi.c
+@@ -17,8 +17,10 @@
+  * (at your option) any later version.
+  */
+ 
++#undef pr_fmt
+ #define pr_fmt(fmt) KBUILD_MODNAME ": " fmt
+ 
++#include <linux/printk.h>
+ #include <linux/hardirq.h>
+ #include <linux/interrupt.h>
+ #include <linux/module.h>
+--- a/drivers/net/wireless/libertas/rx.c
++++ b/drivers/net/wireless/libertas/rx.c
+@@ -2,8 +2,10 @@
+  * This file contains the handling of RX in wlan driver.
+  */
+ 
++#undef pr_fmt
+ #define pr_fmt(fmt) KBUILD_MODNAME ": " fmt
+ 
++#include <linux/printk.h>
+ #include <linux/etherdevice.h>
+ #include <linux/hardirq.h>
+ #include <linux/slab.h>
+--- a/drivers/net/wireless/libertas/if_cs.c
++++ b/drivers/net/wireless/libertas/if_cs.c
+@@ -21,8 +21,10 @@
+ 
+ */
+ 
++#undef pr_fmt
+ #define pr_fmt(fmt) KBUILD_MODNAME ": " fmt
+ 
++#include <linux/printk.h>
+ #include <linux/module.h>
+ #include <linux/slab.h>
+ #include <linux/delay.h>
+--- a/drivers/net/wireless/libertas/mesh.c
++++ b/drivers/net/wireless/libertas/mesh.c
+@@ -1,5 +1,7 @@
++#undef pr_fmt
+ #define pr_fmt(fmt) KBUILD_MODNAME ": " fmt
+ 
++#include <linux/printk.h>
+ #include <linux/delay.h>
+ #include <linux/etherdevice.h>
+ #include <linux/hardirq.h>
+--- a/drivers/net/wireless/libertas/main.c
++++ b/drivers/net/wireless/libertas/main.c
+@@ -4,8 +4,10 @@
+  * thread etc..
+  */
+ 
++#undef pr_fmt
+ #define pr_fmt(fmt) KBUILD_MODNAME ": " fmt
+ 
++#include <linux/printk.h>
+ #include <linux/module.h>
+ #include <linux/delay.h>
+ #include <linux/etherdevice.h>
+--- a/drivers/net/wireless/libertas_tf/cmd.c
++++ b/drivers/net/wireless/libertas_tf/cmd.c
+@@ -7,8 +7,10 @@
+  *  the Free Software Foundation; either version 2 of the License, or (at
+  *  your option) any later version.
+  */
++#undef pr_fmt
+ #define pr_fmt(fmt) KBUILD_MODNAME ": " fmt
+ 
++#include <linux/printk.h>
+ #include <linux/hardirq.h>
+ #include <linux/slab.h>
+ #include <linux/export.h>
+--- a/drivers/net/wireless/libertas_tf/if_usb.c
++++ b/drivers/net/wireless/libertas_tf/if_usb.c
+@@ -9,11 +9,13 @@
+  */
+ #define DRV_NAME "lbtf_usb"
+ 
++#undef pr_fmt
+ #define pr_fmt(fmt) KBUILD_MODNAME ": " fmt
+ 
+ #include "libertas_tf.h"
+ #include "if_usb.h"
+ 
++#include <linux/printk.h>
+ #include <linux/delay.h>
+ #include <linux/module.h>
+ #include <linux/firmware.h>
+--- a/drivers/net/wireless/libertas_tf/main.c
++++ b/drivers/net/wireless/libertas_tf/main.c
+@@ -7,8 +7,10 @@
+  *  the Free Software Foundation; either version 2 of the License, or (at
+  *  your option) any later version.
+  */
++#undef pr_fmt
+ #define pr_fmt(fmt) KBUILD_MODNAME ": " fmt
+ 
++#include <linux/printk.h>
+ #include <linux/hardirq.h>
+ #include <linux/slab.h>
+ 
+--- a/drivers/net/wireless/brcm80211/brcmsmac/phy/phy_n.c
++++ b/drivers/net/wireless/brcm80211/brcmsmac/phy/phy_n.c
+@@ -14,9 +14,11 @@
+  * CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
+  */
+ 
++#undef pr_fmt
+ #define pr_fmt(fmt) KBUILD_MODNAME ": " fmt
+ 
+ #include <linux/kernel.h>
++#include <linux/printk.h>
+ #include <linux/delay.h>
+ #include <linux/cordic.h>
+ 
+--- a/drivers/net/wireless/brcm80211/brcmsmac/mac80211_if.c
++++ b/drivers/net/wireless/brcm80211/brcmsmac/mac80211_if.c
+@@ -15,8 +15,10 @@
+  */
+ 
+ #define __UNDEF_NO_VERSION__
++#undef pr_fmt
+ #define pr_fmt(fmt) KBUILD_MODNAME ": " fmt
+ 
++#include <linux/printk.h>
+ #include <linux/etherdevice.h>
+ #include <linux/sched.h>
+ #include <linux/firmware.h>
+--- a/drivers/net/wireless/brcm80211/brcmsmac/main.c
++++ b/drivers/net/wireless/brcm80211/brcmsmac/main.c
+@@ -14,8 +14,10 @@
+  * CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
+  */
+ 
++#undef pr_fmt
+ #define pr_fmt(fmt) KBUILD_MODNAME ": " fmt
+ 
++#include <linux/printk.h>
+ #include <linux/pci_ids.h>
+ #include <linux/if_ether.h>
+ #include <net/cfg80211.h>
+--- a/drivers/net/wireless/brcm80211/brcmutil/utils.c
++++ b/drivers/net/wireless/brcm80211/brcmutil/utils.c
+@@ -14,8 +14,10 @@
+  * CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
+  */
+ 
++#undef pr_fmt
+ #define pr_fmt(fmt) KBUILD_MODNAME ": " fmt
+ 
++#include <linux/printk.h>
+ #include <linux/netdevice.h>
+ #include <linux/module.h>
+ 
+--- a/net/bluetooth/lib.c
++++ b/net/bluetooth/lib.c
+@@ -24,9 +24,11 @@
+ 
+ /* Bluetooth kernel library. */
+ 
++#undef pr_fmt
+ #define pr_fmt(fmt) "Bluetooth: " fmt
+ 
+ #include <linux/export.h>
++#include <linux/printk.h>
+ 
+ #include <net/bluetooth/bluetooth.h>
+ 
+--- a/net/wireless/lib80211.c
++++ b/net/wireless/lib80211.c
+@@ -13,8 +13,10 @@
+  *
+  */
+ 
++#undef pr_fmt
+ #define pr_fmt(fmt) KBUILD_MODNAME ": " fmt
+ 
++#include <linux/printk.h>
+ #include <linux/module.h>
+ #include <linux/ctype.h>
+ #include <linux/ieee80211.h>
+--- a/net/wireless/reg.c
++++ b/net/wireless/reg.c
+@@ -42,9 +42,11 @@
+  *
+  */
+ 
++#undef pr_fmt
+ #define pr_fmt(fmt) KBUILD_MODNAME ": " fmt
+ 
+ #include <linux/kernel.h>
++#include <linux/printk.h>
+ #include <linux/export.h>
+ #include <linux/slab.h>
+ #include <linux/list.h>
+--- a/net/wireless/core.c
++++ b/net/wireless/core.c
+@@ -4,8 +4,10 @@
+  * Copyright 2006-2010		Johannes Berg <johannes@sipsolutions.net>
+  */
+ 
++#undef pr_fmt
+ #define pr_fmt(fmt) KBUILD_MODNAME ": " fmt
+ 
++#include <linux/printk.h>
+ #include <linux/if.h>
+ #include <linux/module.h>
+ #include <linux/err.h>
+--- a/net/wireless/lib80211_crypt_tkip.c
++++ b/net/wireless/lib80211_crypt_tkip.c
+@@ -10,8 +10,10 @@
+  * more details.
+  */
+ 
++#undef pr_fmt
+ #define pr_fmt(fmt) KBUILD_MODNAME ": " fmt
+ 
++#include <linux/printk.h>
+ #include <linux/err.h>
+ #include <linux/module.h>
+ #include <linux/init.h>
+--- a/drivers/net/wireless/brcm80211/brcmsmac/aiutils.c
++++ b/drivers/net/wireless/brcm80211/brcmsmac/aiutils.c
+@@ -16,8 +16,10 @@
+  * File contents: support functions for PCI/PCIe
+  */
+ 
++#undef pr_fmt
+ #define pr_fmt(fmt) KBUILD_MODNAME ": " fmt
+ 
++#include <linux/printk.h>
+ #include <linux/delay.h>
+ 
+ #include <defs.h>
+--- a/drivers/net/wireless/rtlwifi/wifi.h
++++ b/drivers/net/wireless/rtlwifi/wifi.h
+@@ -30,8 +30,10 @@
+ #ifndef __RTL_WIFI_H__
+ #define __RTL_WIFI_H__
+ 
++#undef pr_fmt
+ #define pr_fmt(fmt) KBUILD_MODNAME ": " fmt
+ 
++#include <linux/printk.h>
+ #include <linux/sched.h>
+ #include <linux/firmware.h>
+ #include <linux/etherdevice.h>
+--- a/drivers/net/wireless/ath/main.c
++++ b/drivers/net/wireless/ath/main.c
+@@ -14,9 +14,11 @@
+  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
+  */
+ 
++#undef pr_fmt
+ #define pr_fmt(fmt) KBUILD_MODNAME ": " fmt
+ 
+ #include <linux/kernel.h>
++#include <linux/printk.h>
+ #include <linux/module.h>
+ 
+ #include "ath.h"
+--- a/drivers/net/wireless/ath/regd.c
++++ b/drivers/net/wireless/ath/regd.c
+@@ -14,9 +14,11 @@
+  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
+  */
+ 
++#undef pr_fmt
+ #define pr_fmt(fmt) KBUILD_MODNAME ": " fmt
+ 
+ #include <linux/kernel.h>
++#include <linux/printk.h>
+ #include <linux/export.h>
+ #include <net/cfg80211.h>
+ #include <net/mac80211.h>
+--- a/drivers/net/wireless/ath/ath5k/initvals.c
++++ b/drivers/net/wireless/ath/ath5k/initvals.c
+@@ -19,8 +19,11 @@
+  *
+  */
+ 
++#undef pr_fmt
+ #define pr_fmt(fmt) KBUILD_MODNAME ": " fmt
+ 
++#include <linux/printk.h>
++
+ #include "ath5k.h"
+ #include "reg.h"
+ #include "debug.h"
+--- a/drivers/net/wireless/ath/ath5k/desc.c
++++ b/drivers/net/wireless/ath/ath5k/desc.c
+@@ -21,8 +21,11 @@
+  Hardware Descriptor Functions
+ \******************************/
+ 
++#undef pr_fmt
+ #define pr_fmt(fmt) KBUILD_MODNAME ": " fmt
+ 
++#include <linux/printk.h>
++
+ #include "ath5k.h"
+ #include "reg.h"
+ #include "debug.h"
+--- a/drivers/net/wireless/ath/ath5k/dma.c
++++ b/drivers/net/wireless/ath/ath5k/dma.c
+@@ -29,8 +29,11 @@
+  * status registers (ISR).
+  */
+ 
++#undef pr_fmt
+ #define pr_fmt(fmt) KBUILD_MODNAME ": " fmt
+ 
++#include <linux/printk.h>
++
+ #include "ath5k.h"
+ #include "reg.h"
+ #include "debug.h"
+--- a/drivers/net/wireless/ath/ath5k/qcu.c
++++ b/drivers/net/wireless/ath/ath5k/qcu.c
+@@ -20,8 +20,11 @@
+ Queue Control Unit, DCF Control Unit Functions
+ \********************************************/
+ 
++#undef pr_fmt
+ #define pr_fmt(fmt) KBUILD_MODNAME ": " fmt
+ 
++#include <linux/printk.h>
++
+ #include "ath5k.h"
+ #include "reg.h"
+ #include "debug.h"
+--- a/drivers/net/wireless/ath/ath5k/phy.c
++++ b/drivers/net/wireless/ath/ath5k/phy.c
+@@ -22,8 +22,10 @@
+ * PHY related functions *
+ \***********************/
+ 
++#undef pr_fmt
+ #define pr_fmt(fmt) KBUILD_MODNAME ": " fmt
+ 
++#include <linux/printk.h>
+ #include <linux/delay.h>
+ #include <linux/slab.h>
+ #include <asm/unaligned.h>
+--- a/drivers/net/wireless/ath/ath5k/reset.c
++++ b/drivers/net/wireless/ath/ath5k/reset.c
+@@ -23,10 +23,12 @@
+   Reset function and helpers
+ \****************************/
+ 
++#undef pr_fmt
+ #define pr_fmt(fmt) KBUILD_MODNAME ": " fmt
+ 
+ #include <asm/unaligned.h>
+ 
++#include <linux/printk.h>
+ #include <linux/pci.h>		/* To determine if a card is pci-e */
+ #include <linux/log2.h>
+ #include <linux/platform_device.h>
+--- a/drivers/net/wireless/ath/ath5k/attach.c
++++ b/drivers/net/wireless/ath/ath5k/attach.c
+@@ -20,8 +20,10 @@
+ * Attach/Detach Functions and helpers *
+ \*************************************/
+ 
++#undef pr_fmt
+ #define pr_fmt(fmt) KBUILD_MODNAME ": " fmt
+ 
++#include <linux/printk.h>
+ #include <linux/pci.h>
+ #include <linux/slab.h>
+ #include "ath5k.h"
+--- a/drivers/net/wireless/ath/ath5k/base.c
++++ b/drivers/net/wireless/ath/ath5k/base.c
+@@ -40,8 +40,10 @@
+  *
+  */
+ 
++#undef pr_fmt
+ #define pr_fmt(fmt) KBUILD_MODNAME ": " fmt
+ 
++#include <linux/printk.h>
+ #include <linux/module.h>
+ #include <linux/delay.h>
+ #include <linux/dma-mapping.h>
+--- a/drivers/net/wireless/ath/ath5k/led.c
++++ b/drivers/net/wireless/ath/ath5k/led.c
+@@ -39,8 +39,10 @@
+  *
+  */
+ 
++#undef pr_fmt
+ #define pr_fmt(fmt) KBUILD_MODNAME ": " fmt
+ 
++#include <linux/printk.h>
+ #include <linux/pci.h>
+ #include "ath5k.h"
+ 
+--- a/drivers/net/wireless/ath/ath5k/ani.c
++++ b/drivers/net/wireless/ath/ath5k/ani.c
+@@ -14,8 +14,11 @@
+  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
+  */
+ 
++#undef pr_fmt
+ #define pr_fmt(fmt) KBUILD_MODNAME ": " fmt
+ 
++#include <linux/printk.h>
++
+ #include "ath5k.h"
+ #include "reg.h"
+ #include "debug.h"
+--- a/drivers/net/wireless/ath/ath5k/sysfs.c
++++ b/drivers/net/wireless/ath/ath5k/sysfs.c
+@@ -1,5 +1,7 @@
++#undef pr_fmt
+ #define pr_fmt(fmt) KBUILD_MODNAME ": " fmt
+ 
++#include <linux/printk.h>
+ #include <linux/device.h>
+ #include <linux/pci.h>
+ 
+--- a/drivers/net/wireless/ath/ath5k/mac80211-ops.c
++++ b/drivers/net/wireless/ath/ath5k/mac80211-ops.c
+@@ -41,11 +41,14 @@
+  *
+  */
+ 
++#undef pr_fmt
+ #define pr_fmt(fmt) KBUILD_MODNAME ": " fmt
+ 
+ #include <net/mac80211.h>
+ #include <asm/unaligned.h>
+ 
++#include <linux/printk.h>
++
+ #include "ath5k.h"
+ #include "base.h"
+ #include "reg.h"
+--- a/drivers/net/wireless/ath/ath5k/pci.c
++++ b/drivers/net/wireless/ath/ath5k/pci.c
+@@ -14,8 +14,10 @@
+  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
+  */
+ 
++#undef pr_fmt
+ #define pr_fmt(fmt) KBUILD_MODNAME ": " fmt
+ 
++#include <linux/printk.h>
+ #include <linux/nl80211.h>
+ #include <linux/pci.h>
+ #include <linux/pci-aspm.h>
+--- a/drivers/net/wireless/ath/ath6kl/cfg80211.c
++++ b/drivers/net/wireless/ath/ath6kl/cfg80211.c
+@@ -15,8 +15,10 @@
+  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
+  */
+ 
++#undef pr_fmt
+ #define pr_fmt(fmt) KBUILD_MODNAME ": " fmt
+ 
++#include <linux/printk.h>
+ #include <linux/moduleparam.h>
+ #include <linux/inetdevice.h>
+ #include <linux/export.h>
+--- a/drivers/net/wireless/ath/ath6kl/init.c
++++ b/drivers/net/wireless/ath/ath6kl/init.c
+@@ -16,8 +16,10 @@
+  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
+  */
+ 
++#undef pr_fmt
+ #define pr_fmt(fmt) KBUILD_MODNAME ": " fmt
+ 
++#include <linux/printk.h>
+ #include <linux/moduleparam.h>
+ #include <linux/errno.h>
+ #include <linux/export.h>
+--- a/drivers/net/wireless/ath/ath6kl/main.c
++++ b/drivers/net/wireless/ath/ath6kl/main.c
+@@ -15,8 +15,11 @@
+  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
+  */
+ 
++#undef pr_fmt
+ #define pr_fmt(fmt) KBUILD_MODNAME ": " fmt
+ 
++#include <linux/printk.h>
++
+ #include "core.h"
+ #include "hif-ops.h"
+ #include "cfg80211.h"
+--- a/drivers/net/wireless/ath/ath6kl/txrx.c
++++ b/drivers/net/wireless/ath/ath6kl/txrx.c
+@@ -15,8 +15,11 @@
+  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
+  */
+ 
++#undef pr_fmt
+ #define pr_fmt(fmt) KBUILD_MODNAME ": " fmt
+ 
++#include <linux/printk.h>
++
+ #include "core.h"
+ #include "debug.h"
+ #include "htc-ops.h"
+--- a/drivers/net/wireless/ath/ath9k/init.c
++++ b/drivers/net/wireless/ath/ath9k/init.c
+@@ -14,8 +14,10 @@
+  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
+  */
+ 
++#undef pr_fmt
+ #define pr_fmt(fmt) KBUILD_MODNAME ": " fmt
+ 
++#include <linux/printk.h>
+ #include <linux/dma-mapping.h>
+ #include <linux/slab.h>
+ #include <linux/ath9k_platform.h>
+--- a/drivers/net/wireless/ath/ath9k/pci.c
++++ b/drivers/net/wireless/ath/ath9k/pci.c
+@@ -14,8 +14,10 @@
+  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
+  */
+ 
++#undef pr_fmt
+ #define pr_fmt(fmt) KBUILD_MODNAME ": " fmt
+ 
++#include <linux/printk.h>
+ #include <linux/nl80211.h>
+ #include <linux/pci.h>
+ #include <linux/pci-aspm.h>
+--- a/drivers/net/wireless/ath/ath9k/htc_hst.c
++++ b/drivers/net/wireless/ath/ath9k/htc_hst.c
+@@ -14,8 +14,11 @@
+  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
+  */
+ 
++#undef pr_fmt
+ #define pr_fmt(fmt) KBUILD_MODNAME ": " fmt
+ 
++#include <linux/printk.h>
++
+ #include "htc.h"
+ 
+ static int htc_issue_send(struct htc_target *target, struct sk_buff* skb,
+--- a/drivers/net/wireless/ath/ath9k/htc_drv_init.c
++++ b/drivers/net/wireless/ath/ath9k/htc_drv_init.c
+@@ -14,8 +14,11 @@
+  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
+  */
+ 
++#undef pr_fmt
+ #define pr_fmt(fmt) KBUILD_MODNAME ": " fmt
+ 
++#include <linux/printk.h>
++
+ #include "htc.h"
+ 
+ MODULE_AUTHOR("Atheros Communications");
+--- a/drivers/net/wireless/iwlwifi/dvm/main.c
++++ b/drivers/net/wireless/iwlwifi/dvm/main.c
+@@ -27,8 +27,10 @@
+  *
+  *****************************************************************************/
+ 
++#undef pr_fmt
+ #define pr_fmt(fmt) KBUILD_MODNAME ": " fmt
+ 
++#include <linux/printk.h>
+ #include <linux/kernel.h>
+ #include <linux/module.h>
+ #include <linux/init.h>
+--- a/drivers/net/wireless/iwlwifi/pcie/drv.c
++++ b/drivers/net/wireless/iwlwifi/pcie/drv.c
+@@ -61,8 +61,10 @@
+  *
+  *****************************************************************************/
+ 
++#undef pr_fmt
+ #define pr_fmt(fmt) KBUILD_MODNAME ": " fmt
+ 
++#include <linux/printk.h>
+ #include <linux/module.h>
+ #include <linux/pci.h>
+ #include <linux/pci-aspm.h>
+--- a/drivers/net/wireless/ath/ath5k/eeprom.c
++++ b/drivers/net/wireless/ath/ath5k/eeprom.c
+@@ -21,8 +21,10 @@
+ * EEPROM access functions and helpers *
+ \*************************************/
+ 
++#undef pr_fmt
+ #define pr_fmt(fmt) KBUILD_MODNAME ": " fmt
+ 
++#include <linux/printk.h>
+ #include <linux/slab.h>
+ 
+ #include "ath5k.h"
+--- a/drivers/net/wireless/ath/ath5k/debug.c
++++ b/drivers/net/wireless/ath/ath5k/debug.c
+@@ -58,8 +58,10 @@
+  * THE POSSIBILITY OF SUCH DAMAGES.
+  */
+ 
++#undef pr_fmt
+ #define pr_fmt(fmt) KBUILD_MODNAME ": " fmt
+ 
++#include <linux/printk.h>
+ #include <linux/export.h>
+ #include <linux/moduleparam.h>
+ 

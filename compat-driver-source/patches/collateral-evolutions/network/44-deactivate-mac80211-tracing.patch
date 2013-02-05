@@ -1,0 +1,27 @@
+Do not activate the mac80211 tracing for kernels <= 2.6.32
+
+--- a/net/mac80211/Makefile
++++ b/net/mac80211/Makefile
+@@ -25,7 +25,9 @@ mac80211-y := \
+ 	wme.o \
+ 	event.o \
+ 	chan.o \
+-	trace.o mlme.o
++	mlme.o
++
++mac80211-$(CONFIG_COMPAT_MAC80211_DRIVER_API_TRACER) += trace.o
+ 
+ mac80211-$(CONFIG_MAC80211_LEDS) += led.o
+ mac80211-$(CONFIG_MAC80211_DEBUGFS) += \
+--- a/net/wireless/Makefile
++++ b/net/wireless/Makefile
+@@ -10,7 +10,8 @@ obj-$(CONFIG_WEXT_SPY) += wext-spy.o
+ obj-$(CONFIG_WEXT_PRIV) += wext-priv.o
+ 
+ cfg80211-y += core.o sysfs.o radiotap.o util.o reg.o scan.o nl80211.o
+-cfg80211-y += mlme.o ibss.o sme.o chan.o ethtool.o mesh.o ap.o trace.o
++cfg80211-y += mlme.o ibss.o sme.o chan.o ethtool.o mesh.o ap.o
++cfg80211-$(CONFIG_COMPAT_CFG80211_DRIVER_API_TRACER) += trace.o
+ cfg80211-$(CONFIG_CFG80211_DEBUGFS) += debugfs.o
+ cfg80211-$(CONFIG_CFG80211_WEXT) += wext-compat.o wext-sme.o
+ cfg80211-$(CONFIG_CFG80211_INTERNAL_REGDB) += regdb.o

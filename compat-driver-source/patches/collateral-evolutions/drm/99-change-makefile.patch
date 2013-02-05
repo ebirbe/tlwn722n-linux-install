@@ -1,0 +1,28 @@
+Remove drivers that we do not want to build from gpu/drm/Makefile
+
+--- a/drivers/gpu/drm/Makefile
++++ b/drivers/gpu/drm/Makefile
+@@ -31,23 +31,14 @@ CFLAGS_drm_trace_points.o := -I$(src)
+ obj-$(CONFIG_COMPAT_DRM)	+= drm.o
+ obj-$(CONFIG_COMPAT_DRM_USB)   += drm_usb.o
+ obj-$(CONFIG_COMPAT_DRM_TTM)	+= ttm/
+-obj-$(CONFIG_COMPAT_DRM_TDFX)	+= tdfx/
+-obj-$(CONFIG_COMPAT_DRM_R128)	+= r128/
+ obj-$(CONFIG_COMPAT_DRM_RADEON)+= radeon/
+-obj-$(CONFIG_COMPAT_DRM_MGA)	+= mga/
+ obj-$(CONFIG_COMPAT_DRM_I810)	+= i810/
+ obj-$(CONFIG_COMPAT_DRM_I915)  += i915/
+ obj-$(CONFIG_COMPAT_DRM_MGAG200) += mgag200/
+ obj-$(CONFIG_COMPAT_DRM_CIRRUS_QEMU) += cirrus/
+-obj-$(CONFIG_COMPAT_DRM_SIS)   += sis/
+-obj-$(CONFIG_COMPAT_DRM_SAVAGE)+= savage/
+ obj-$(CONFIG_COMPAT_DRM_VMWGFX)+= vmwgfx/
+ obj-$(CONFIG_COMPAT_DRM_VIA)	+=via/
+ obj-$(CONFIG_COMPAT_DRM_NOUVEAU) +=nouveau/
+-obj-$(CONFIG_COMPAT_DRM_EXYNOS) +=exynos/
+ obj-$(CONFIG_COMPAT_DRM_GMA500) += gma500/
+-obj-$(CONFIG_COMPAT_DRM_UDL) += udl/
+ obj-$(CONFIG_COMPAT_DRM_AST) += ast/
+-obj-$(CONFIG_COMPAT_DRM_SHMOBILE) +=shmobile/
+-obj-$(CONFIG_COMPAT_DRM_TEGRA) += tegra/
+ obj-y			+= i2c/

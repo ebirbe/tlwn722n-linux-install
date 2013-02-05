@@ -1,0 +1,351 @@
+Disable PRIME support in core drm, radeon, nouveau and i915 for
+kernels < 3.4.0.
+
+PRIME depends on dma-buf which is added to the kernel with 3.3 but
+the one in 3.3 is mostly stub, e.g. it is a skeleton API which
+is highly modified in 3.4. So disable PRIME for kernels < 3.4.0,
+not < 3.3.0.
+
+--- a/drivers/gpu/drm/drm_drv.c
++++ b/drivers/gpu/drm/drm_drv.c
+@@ -137,8 +137,10 @@ static struct drm_ioctl_desc drm_ioctls[
+ 
+ 	DRM_IOCTL_DEF(DRM_IOCTL_MODE_GETRESOURCES, drm_mode_getresources, DRM_CONTROL_ALLOW|DRM_UNLOCKED),
+ 
++#if (LINUX_VERSION_CODE >= KERNEL_VERSION(3,4,0))
+ 	DRM_IOCTL_DEF(DRM_IOCTL_PRIME_HANDLE_TO_FD, drm_prime_handle_to_fd_ioctl, DRM_AUTH|DRM_UNLOCKED),
+ 	DRM_IOCTL_DEF(DRM_IOCTL_PRIME_FD_TO_HANDLE, drm_prime_fd_to_handle_ioctl, DRM_AUTH|DRM_UNLOCKED),
++#endif
+ 
+ 	DRM_IOCTL_DEF(DRM_IOCTL_MODE_GETPLANERESOURCES, drm_mode_getplane_res, DRM_CONTROL_ALLOW|DRM_UNLOCKED),
+ 	DRM_IOCTL_DEF(DRM_IOCTL_MODE_GETCRTC, drm_mode_getcrtc, DRM_CONTROL_ALLOW|DRM_UNLOCKED),
+--- a/drivers/gpu/drm/drm_fops.c
++++ b/drivers/gpu/drm/drm_fops.c
+@@ -284,8 +284,10 @@ static int drm_open_helper(struct inode
+ 	if (dev->driver->driver_features & DRIVER_GEM)
+ 		drm_gem_open(dev, priv);
+ 
++#if (LINUX_VERSION_CODE >= KERNEL_VERSION(3,4,0))
+ 	if (drm_core_check_feature(dev, DRIVER_PRIME))
+ 		drm_prime_init_file_private(&priv->prime);
++#endif
+ 
+ 	if (dev->driver->open) {
+ 		ret = dev->driver->open(dev, priv);
+@@ -538,8 +540,10 @@ int drm_release(struct inode *inode, str
+ 	if (dev->driver->postclose)
+ 		dev->driver->postclose(dev, file_priv);
+ 
++#if (LINUX_VERSION_CODE >= KERNEL_VERSION(3,4,0))
+ 	if (drm_core_check_feature(dev, DRIVER_PRIME))
+ 		drm_prime_destroy_file_private(&file_priv->prime);
++#endif
+ 
+ 	put_pid(file_priv->pid);
+ 	kfree(file_priv);
+--- a/drivers/gpu/drm/drm_gem.c
++++ b/drivers/gpu/drm/drm_gem.c
+@@ -35,7 +35,9 @@
+ #include <linux/mman.h>
+ #include <linux/pagemap.h>
+ #include <linux/shmem_fs.h>
++#if (LINUX_VERSION_CODE >= KERNEL_VERSION(3,4,0))
+ #include <linux/dma-buf.h>
++#endif
+ #include <drm/drmP.h>
+ 
+ /** @file drm_gem.c
+@@ -204,6 +206,7 @@ EXPORT_SYMBOL(drm_gem_object_alloc);
+ static void
+ drm_gem_remove_prime_handles(struct drm_gem_object *obj, struct drm_file *filp)
+ {
++#if (LINUX_VERSION_CODE >= KERNEL_VERSION(3,4,0))
+ 	if (obj->import_attach) {
+ 		drm_prime_remove_imported_buf_handle(&filp->prime,
+ 				obj->import_attach->dmabuf);
+@@ -212,6 +215,7 @@ drm_gem_remove_prime_handles(struct drm_
+ 		drm_prime_remove_imported_buf_handle(&filp->prime,
+ 				obj->export_dma_buf);
+ 	}
++#endif
+ }
+ 
+ /**
+--- a/drivers/gpu/drm/drm_prime.c
++++ b/drivers/gpu/drm/drm_prime.c
+@@ -26,6 +26,8 @@
+  *
+  */
+ 
++#if (LINUX_VERSION_CODE >= KERNEL_VERSION(3,4,0))
++
+ #include <linux/export.h>
+ #include <linux/dma-buf.h>
+ #include <drm/drmP.h>
+@@ -350,3 +352,4 @@ void drm_prime_remove_imported_buf_handl
+ 	mutex_unlock(&prime_fpriv->lock);
+ }
+ EXPORT_SYMBOL(drm_prime_remove_imported_buf_handle);
++#endif /* (LINUX_VERSION_CODE >= KERNEL_VERSION(3,4,0)) */
+--- a/drivers/gpu/drm/nouveau/nouveau_prime.c
++++ b/drivers/gpu/drm/nouveau/nouveau_prime.c
+@@ -24,6 +24,7 @@
+ 
+ #include <linux/dma-buf.h>
+ 
++#if (LINUX_VERSION_CODE >= KERNEL_VERSION(3,4,0))
+ #include <drm/drmP.h>
+ 
+ #include "nouveau_drm.h"
+@@ -225,4 +226,4 @@ fail_detach:
+ 	dma_buf_detach(dma_buf, attach);
+ 	return ERR_PTR(ret);
+ }
+-
++#endif /* (LINUX_VERSION_CODE >= KERNEL_VERSION(3,4,0)) */
+--- a/drivers/gpu/drm/radeon/radeon_prime.c
++++ b/drivers/gpu/drm/radeon/radeon_prime.c
+@@ -23,6 +23,7 @@
+  *
+  * Authors: Alex Deucher
+  */
++#if (LINUX_VERSION_CODE >= KERNEL_VERSION(3,4,0))
+ #include <drm/drmP.h>
+ 
+ #include "radeon.h"
+@@ -226,3 +227,4 @@ fail_detach:
+ 	dma_buf_detach(dma_buf, attach);
+ 	return ERR_PTR(ret);
+ }
++#endif /* (LINUX_VERSION_CODE >= KERNEL_VERSION(3,4,0)) */
+--- a/drivers/gpu/drm/radeon/radeon_drv.c
++++ b/drivers/gpu/drm/radeon/radeon_drv.c
+@@ -359,8 +359,10 @@ static const struct file_operations rade
+ static struct drm_driver kms_driver = {
+ 	.driver_features =
+ 	    DRIVER_USE_AGP | DRIVER_USE_MTRR | DRIVER_PCI_DMA | DRIVER_SG |
+-	    DRIVER_HAVE_IRQ | DRIVER_HAVE_DMA | DRIVER_IRQ_SHARED | DRIVER_GEM |
+-	    DRIVER_PRIME,
++#if (LINUX_VERSION_CODE >= KERNEL_VERSION(3,4,0))
++	    DRIVER_PRIME |
++#endif
++	    DRIVER_HAVE_IRQ | DRIVER_HAVE_DMA | DRIVER_IRQ_SHARED | DRIVER_GEM,
+ 	.dev_priv_size = 0,
+ 	.load = radeon_driver_load_kms,
+ 	.firstopen = radeon_driver_firstopen_kms,
+@@ -395,10 +397,12 @@ static struct drm_driver kms_driver = {
+ 	.dumb_destroy = radeon_mode_dumb_destroy,
+ 	.fops = &radeon_driver_kms_fops,
+ 
++#if (LINUX_VERSION_CODE >= KERNEL_VERSION(3,4,0))
+ 	.prime_handle_to_fd = drm_gem_prime_handle_to_fd,
+ 	.prime_fd_to_handle = drm_gem_prime_fd_to_handle,
+ 	.gem_prime_export = radeon_gem_prime_export,
+ 	.gem_prime_import = radeon_gem_prime_import,
++#endif
+ 
+ 	.name = DRIVER_NAME,
+ 	.desc = DRIVER_DESC,
+--- a/drivers/gpu/drm/radeon/radeon_gem.c
++++ b/drivers/gpu/drm/radeon/radeon_gem.c
+@@ -41,8 +41,10 @@ void radeon_gem_object_free(struct drm_g
+ 	struct radeon_bo *robj = gem_to_radeon_bo(gobj);
+ 
+ 	if (robj) {
++#if (LINUX_VERSION_CODE >= KERNEL_VERSION(3,4,0))
+ 		if (robj->gem_base.import_attach)
+ 			drm_prime_gem_destroy(&robj->gem_base, robj->tbo.sg);
++#endif
+ 		radeon_bo_unref(&robj);
+ 	}
+ }
+--- a/drivers/gpu/drm/radeon/radeon_ttm.c
++++ b/drivers/gpu/drm/radeon/radeon_ttm.c
+@@ -583,17 +583,21 @@ static int radeon_ttm_tt_populate(struct
+ 	struct radeon_ttm_tt *gtt = (void *)ttm;
+ 	unsigned i;
+ 	int r;
++#if (LINUX_VERSION_CODE >= KERNEL_VERSION(3,4,0))
+ 	bool slave = !!(ttm->page_flags & TTM_PAGE_FLAG_SG);
++#endif
+ 
+ 	if (ttm->state != tt_unpopulated)
+ 		return 0;
+ 
++#if (LINUX_VERSION_CODE >= KERNEL_VERSION(3,4,0))
+ 	if (slave && ttm->sg) {
+ 		drm_prime_sg_to_page_addr_arrays(ttm->sg, ttm->pages,
+ 						 gtt->ttm.dma_address, ttm->num_pages);
+ 		ttm->state = tt_unbound;
+ 		return 0;
+ 	}
++#endif
+ 
+ 	rdev = radeon_get_rdev(ttm->bdev);
+ #if __OS_HAS_AGP
+@@ -637,10 +641,12 @@ static void radeon_ttm_tt_unpopulate(str
+ 	struct radeon_device *rdev;
+ 	struct radeon_ttm_tt *gtt = (void *)ttm;
+ 	unsigned i;
++#if (LINUX_VERSION_CODE >= KERNEL_VERSION(3,4,0))
+ 	bool slave = !!(ttm->page_flags & TTM_PAGE_FLAG_SG);
+ 
+ 	if (slave)
+ 		return;
++#endif
+ 
+ 	rdev = radeon_get_rdev(ttm->bdev);
+ #if __OS_HAS_AGP
+--- a/drivers/gpu/drm/nouveau/nouveau_bo.c
++++ b/drivers/gpu/drm/nouveau/nouveau_bo.c
+@@ -1351,11 +1351,14 @@ nouveau_ttm_tt_populate(struct ttm_tt *t
+ 	struct drm_device *dev;
+ 	unsigned i;
+ 	int r;
++#if (LINUX_VERSION_CODE >= KERNEL_VERSION(3,4,0))
+ 	bool slave = !!(ttm->page_flags & TTM_PAGE_FLAG_SG);
++#endif
+ 
+ 	if (ttm->state != tt_unpopulated)
+ 		return 0;
+ 
++#if (LINUX_VERSION_CODE >= KERNEL_VERSION(3,4,0))
+ 	if (slave && ttm->sg) {
+ 		/* make userspace faulting work */
+ 		drm_prime_sg_to_page_addr_arrays(ttm->sg, ttm->pages,
+@@ -1363,6 +1366,7 @@ nouveau_ttm_tt_populate(struct ttm_tt *t
+ 		ttm->state = tt_unbound;
+ 		return 0;
+ 	}
++#endif
+ 
+ 	drm = nouveau_bdev(ttm->bdev);
+ 	dev = drm->dev;
+@@ -1410,10 +1414,12 @@ nouveau_ttm_tt_unpopulate(struct ttm_tt
+ 	struct nouveau_drm *drm;
+ 	struct drm_device *dev;
+ 	unsigned i;
++#if (LINUX_VERSION_CODE >= KERNEL_VERSION(3,4,0))
+ 	bool slave = !!(ttm->page_flags & TTM_PAGE_FLAG_SG);
+ 
+ 	if (slave)
+ 		return;
++#endif
+ 
+ 	drm = nouveau_bdev(ttm->bdev);
+ 	dev = drm->dev;
+--- a/drivers/gpu/drm/nouveau/nouveau_drm.c
++++ b/drivers/gpu/drm/nouveau/nouveau_drm.c
+@@ -627,7 +627,10 @@ driver = {
+ 	.driver_features =
+ 		DRIVER_USE_AGP | DRIVER_PCI_DMA | DRIVER_SG |
+ 		DRIVER_HAVE_IRQ | DRIVER_IRQ_SHARED | DRIVER_GEM |
+-		DRIVER_MODESET | DRIVER_PRIME,
++#if (LINUX_VERSION_CODE >= KERNEL_VERSION(3,4,0))
++		DRIVER_PRIME |
++#endif
++		DRIVER_MODESET,
+ 
+ 	.load = nouveau_drm_load,
+ 	.unload = nouveau_drm_unload,
+@@ -648,10 +651,12 @@ driver = {
+ 	.ioctls = nouveau_ioctls,
+ 	.fops = &nouveau_driver_fops,
+ 
++#if (LINUX_VERSION_CODE >= KERNEL_VERSION(3,4,0))
+ 	.prime_handle_to_fd = drm_gem_prime_handle_to_fd,
+ 	.prime_fd_to_handle = drm_gem_prime_fd_to_handle,
+ 	.gem_prime_export = nouveau_gem_prime_export,
+ 	.gem_prime_import = nouveau_gem_prime_import,
++#endif
+ 
+ 	.gem_init_object = nouveau_gem_object_new,
+ 	.gem_free_object = nouveau_gem_object_del,
+--- a/drivers/gpu/drm/nouveau/nouveau_gem.c
++++ b/drivers/gpu/drm/nouveau/nouveau_gem.c
+@@ -24,7 +24,9 @@
+  *
+  */
+ 
++#if (LINUX_VERSION_CODE >= KERNEL_VERSION(3,4,0))
+ #include <linux/dma-buf.h>
++#endif
+ 
+ #include <subdev/fb.h>
+ 
+@@ -57,8 +59,10 @@ nouveau_gem_object_del(struct drm_gem_ob
+ 		nouveau_bo_unpin(nvbo);
+ 	}
+ 
++#if (LINUX_VERSION_CODE >= KERNEL_VERSION(3,4,0))
+ 	if (gem->import_attach)
+ 		drm_prime_gem_destroy(gem, nvbo->bo.sg);
++#endif
+ 
+ 	ttm_bo_unref(&bo);
+ 
+--- a/drivers/gpu/drm/i915/i915_drv.c
++++ b/drivers/gpu/drm/i915/i915_drv.c
+@@ -1018,7 +1018,11 @@ static struct drm_driver driver = {
+ 	 */
+ 	.driver_features =
+ 	    DRIVER_USE_AGP | DRIVER_REQUIRE_AGP | /* DRIVER_USE_MTRR |*/
++#if (LINUX_VERSION_CODE >= KERNEL_VERSION(3,4,0))
+ 	    DRIVER_HAVE_IRQ | DRIVER_IRQ_SHARED | DRIVER_GEM | DRIVER_PRIME,
++#else
++	    DRIVER_HAVE_IRQ | DRIVER_IRQ_SHARED | DRIVER_GEM,
++#endif
+ 	.load = i915_driver_load,
+ 	.unload = i915_driver_unload,
+ 	.open = i915_driver_open,
+@@ -1041,10 +1045,12 @@ static struct drm_driver driver = {
+ 	.gem_free_object = i915_gem_free_object,
+ 	.gem_vm_ops = &i915_gem_vm_ops,
+ 
++#if (LINUX_VERSION_CODE >= KERNEL_VERSION(3,4,0))
+ 	.prime_handle_to_fd = drm_gem_prime_handle_to_fd,
+ 	.prime_fd_to_handle = drm_gem_prime_fd_to_handle,
+ 	.gem_prime_export = i915_gem_prime_export,
+ 	.gem_prime_import = i915_gem_prime_import,
++#endif
+ 
+ 	.dumb_create = i915_gem_dumb_create,
+ 	.dumb_map_offset = i915_gem_mmap_gtt,
+--- a/drivers/gpu/drm/i915/i915_gem.c
++++ b/drivers/gpu/drm/i915/i915_gem.c
+@@ -34,7 +34,9 @@
+ #include <linux/slab.h>
+ #include <linux/swap.h>
+ #include <linux/pci.h>
++#if (LINUX_VERSION_CODE >= KERNEL_VERSION(3,4,0))
+ #include <linux/dma-buf.h>
++#endif
+ 
+ static void i915_gem_object_flush_gtt_write_domain(struct drm_i915_gem_object *obj);
+ static void i915_gem_object_flush_cpu_write_domain(struct drm_i915_gem_object *obj);
+@@ -3819,8 +3821,10 @@ void i915_gem_free_object(struct drm_gem
+ 
+ 	BUG_ON(obj->pages);
+ 
++#if (LINUX_VERSION_CODE >= KERNEL_VERSION(3,4,0))
+ 	if (obj->base.import_attach)
+ 		drm_prime_gem_destroy(&obj->base, NULL);
++#endif
+ 
+ 	drm_gem_object_release(&obj->base);
+ 	i915_gem_info_remove_obj(dev_priv, obj->base.size);
+--- a/drivers/gpu/drm/i915/i915_gem_dmabuf.c
++++ b/drivers/gpu/drm/i915/i915_gem_dmabuf.c
+@@ -23,6 +23,7 @@
+  * Authors:
+  *	Dave Airlie <airlied@redhat.com>
+  */
++#if (LINUX_VERSION_CODE >= KERNEL_VERSION(3,4,0))
+ #include <drm/drmP.h>
+ #include "i915_drv.h"
+ #include <linux/dma-buf.h>
+@@ -306,3 +307,4 @@ fail_detach:
+ 	dma_buf_detach(dma_buf, attach);
+ 	return ERR_PTR(ret);
+ }
++#endif

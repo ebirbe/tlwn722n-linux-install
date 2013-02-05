@@ -1,0 +1,27 @@
+acpi_get_table_with_size() was exported with kernels >= 3.6. Revert the
+size checking for kernels < 3.6.
+
+--- a/drivers/gpu/drm/radeon/radeon_bios.c
++++ b/drivers/gpu/drm/radeon/radeon_bios.c
+@@ -554,12 +554,21 @@ static bool radeon_acpi_vfct_bios(struct
+ {
+ 	bool ret = false;
+ 	struct acpi_table_header *hdr;
++#if (LINUX_VERSION_CODE >= KERNEL_VERSION(3,6,0))
+ 	acpi_size tbl_size;
++#else
++	/* acpi_get_table_with_size() not exported on kernels < 3.6 */
++	acpi_size tbl_size = 0x7fffffff;
++#endif
+ 	UEFI_ACPI_VFCT *vfct;
+ 	GOP_VBIOS_CONTENT *vbios;
+ 	VFCT_IMAGE_HEADER *vhdr;
+ 
++#if (LINUX_VERSION_CODE >= KERNEL_VERSION(3,6,0))
+ 	if (!ACPI_SUCCESS(acpi_get_table_with_size("VFCT", 1, &hdr, &tbl_size)))
++#else
++	if (!ACPI_SUCCESS(acpi_get_table("VFCT", 1, &hdr)))
++#endif
+ 		return false;
+ 	if (tbl_size < sizeof(UEFI_ACPI_VFCT)) {
+ 		DRM_ERROR("ACPI VFCT table present but broken (too short #1)\n");

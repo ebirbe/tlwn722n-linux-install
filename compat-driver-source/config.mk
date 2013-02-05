@@ -18,7 +18,7 @@ KERNEL_26SUBLEVEL := $(shell $(MAKE) -C $(KLIB_BUILD) kernelversion | sed -n 's/
 endif
 
 ifdef CONFIG_COMPAT_KERNEL_2_6_24
-$(error "ERROR: compat-wireless by default supports kernels >= 2.6.24, try enabling only one driver though")
+$(error "ERROR: compat-drivers by default supports kernels >= 2.6.24, try enabling only one driver though")
 endif #CONFIG_COMPAT_KERNEL_2_6_24
 
 ifeq ($(CONFIG_CFG80211),y)
@@ -76,7 +76,7 @@ endif
 endif # build check
 endif # kernel Makefile check
 
-# These both are needed by compat-wireless || compat-bluetooth so enable them
+# These both are needed by 802.11 and bluetooth so enable
  export CONFIG_COMPAT_RFKILL=y
 
 ifeq ($(CONFIG_MAC80211),y)
@@ -152,20 +152,25 @@ endif #CONFIG_COMPAT_KERNEL_2_6_33
 # export CONFIG_MAC80211_DEBUGFS=y
 # export CONFIG_MAC80211_NOINLINE=y
 # export CONFIG_MAC80211_VERBOSE_DEBUG=y
-# export CONFIG_MAC80211_HT_DEBUG=y
-# export CONFIG_MAC80211_TKIP_DEBUG=y
-# export CONFIG_MAC80211_IBSS_DEBUG=y
-# export CONFIG_MAC80211_VERBOSE_PS_DEBUG=y
-# export CONFIG_MAC80211_VERBOSE_MPL_DEBUG=y
-# export CONFIG_MAC80211_VERBOSE_MHWMP_DEBUG=y
-# export CONFIG_MAC80211_VERBOSE_TDLS_DEBUG
+# export CONFIG_MAC80211_MESSAGE_TRACING=y
 # export CONFIG_MAC80211_DEBUG_COUNTERS=y
+
+# export CONFIG_MAC80211_IBSS_DEBUG=y
+# export CONFIG_MAC80211_PS_DEBUG=y
+# export CONFIG_MAC80211_HT_DEBUG=y
+# export CONFIG_MAC80211_MPL_DEBUG=y
+# export CONFIG_MAC80211_MPATH_DEBUG=y
+# export CONFIG_MAC80211_MHWMP_DEBUG=y
+# export CONFIG_MAC80211_MESH_SYNC_DEBUG=y
+# export CONFIG_MAC80211_TDLS_DEBUG=y
+# export CONFIG_MAC80211_STA_DEBUG=y
+# export CONFIG_MAC80211_MLME_DEBUG=y
 
 # choose between pid and minstrel as default rate control algorithm
 export CONFIG_MAC80211_RC_DEFAULT=minstrel_ht
 export CONFIG_MAC80211_RC_DEFAULT_MINSTREL=y
 # export CONFIG_MAC80211_RC_DEFAULT_PID=y
-# This is the one used by our compat-wireless net/mac80211/rate.c
+# This is the one used by our compat-drivers net/mac80211/rate.c
 # in case you have and old kernel which is overriding this to pid.
 export CONFIG_COMPAT_MAC80211_RC_DEFAULT=minstrel_ht
 export CONFIG_MAC80211_RC_PID=y
@@ -186,6 +191,10 @@ export CONFIG_CFG80211_DEFAULT_PS=y
 # export CONFIG_CFG80211_REG_DEBUG=y
 # export CONFIG_CFG80211_INTERNAL_REGDB=y
 # See below for wext stuff
+
+ifndef CONFIG_COMPAT_KERNEL_2_6_33
+export CONFIG_COMPAT_CFG80211_DRIVER_API_TRACER=y
+endif #CONFIG_COMPAT_KERNEL_2_6_33
 
 export CONFIG_LIB80211=m
 export CONFIG_LIB80211_CRYPT_WEP=m
@@ -209,14 +218,18 @@ ifndef CONFIG_COMPAT_KERNEL_2_6_28
 export CONFIG_COMPAT_BT_HIDP=m
 endif #CONFIG_COMPAT_KERNEL_2_6_28
 
-export CONFIG_BT_HCIUART=M
+export CONFIG_BT_HCIUART=m
 export CONFIG_BT_HCIUART_H4=y
 export CONFIG_BT_HCIUART_BCSP=y
 export CONFIG_BT_HCIUART_ATH3K=y
 export CONFIG_BT_HCIUART_LL=y
+export CONFIG_BT_HCIUART_3WIRE=y
 
 export CONFIG_BT_HCIVHCI=m
 export CONFIG_BT_MRVL=m
+ifndef CONFIG_COMPAT_KERNEL_2_6_39
+export CONFIG_BT_WILINK=m
+endif #CONFIG_COMPAT_KERNEL_2_6_39
 
 ifdef CONFIG_PCMCIA
 export CONFIG_BT_HCIDTL1=m
@@ -228,8 +241,8 @@ endif #CONFIG_PCMCIA
 
 # We need CONFIG_WIRELESS_EXT for CONFIG_CFG80211_WEXT for every kernel 
 # version. The new way CONFIG_CFG80211_WEXT is called from the kernel 
-# does not work with compat-wireless because it calls some callback 
-# function on struct wiphy. This struct is shipped with compat-wireless 
+# does not work with compat-drivers because it calls some callback
+# function on struct wiphy. This struct is shipped with compat-drivers
 # and changes from kernel version to version. We are using the 
 # wireless_handlers attribute which will be activated by 
 # export CONFIG_WIRELESS_EXT. 
@@ -243,8 +256,10 @@ ifdef CONFIG_STAGING
 export CONFIG_COMPAT_STAGING=m
 endif #CONFIG_STAGING
 
+ifndef CONFIG_COMPAT_KERNEL_2_6_31
 # mac80211 test driver
-export CONFIG_MAC80211_HWSIM=m
+export CONFIG_COMPAT_MAC80211_HWSIM=m
+endif #CONFIG_COMPAT_KERNEL_2_6_31
 
 export CONFIG_ATH5K=m
 # export CONFIG_ATH5K_DEBUG=y
@@ -256,7 +271,6 @@ export CONFIG_ATH9K_HW=m
 export CONFIG_ATH9K_COMMON=m
 # export CONFIG_ATH9K_DEBUGFS=y
 # export CONFIG_ATH9K_AHB=y
-# export CONFIG_ATH9K_PKTLOG=y
 
 # Disable this to get minstrel as default, we leave the ath9k
 # rate control algorithm as the default for now as that is also
@@ -279,7 +293,13 @@ ifdef CONFIG_PCI
 export CONFIG_ATH5K_PCI=y
 export CONFIG_ATH9K_PCI=y
 
+ifndef CONFIG_COMPAT_KERNEL_2_6_31
+export CONFIG_WIL6210=m
+export CONFIG_WIL6210_ISR_COR=y
+endif #CONFIG_COMPAT_KERNEL_2_6_31
+
 export CONFIG_IWLWIFI=m
+export CONFIG_IWLDVM=m
 export CONFIG_IWLWIFI_P2P=y
 # export CONFIG_IWLWIFI_DEBUG=y
 # export CONFIG_IWLWIFI_DEBUGFS=y
@@ -382,6 +402,7 @@ export CONFIG_RT2400PCI=m
 export CONFIG_RT2500PCI=m
 ifdef CONFIG_CRC_CCITT
 export CONFIG_RT2800PCI=m
+export CONFIG_RT2800PCI_RT3290=y
 export CONFIG_RT2800PCI_RT33XX=y
 export CONFIG_RT2800PCI_RT35XX=y
 export CONFIG_RT2800PCI_RT53XX=y
@@ -401,12 +422,12 @@ export CONFIG_MWL8K=m
 export CONFIG_ATL1=m
 export CONFIG_ATL2=m
 export CONFIG_ATL1E=m
-ifdef CONFIG_COMPAT_KERNEL_2_6_28
+ifndef CONFIG_COMPAT_KERNEL_2_6_28
 export CONFIG_ATL1C=m
-export CONFIG_ALX=n
-else #CONFIG_COMPAT_KERNEL_2_6_28
-export CONFIG_ATL1C=n
 export CONFIG_ALX=m
+# If MDIO is needed for another driver feel free to
+# make it not depend on 2.6.28
+export CONFIG_COMPAT_MDIO=m
 endif #CONFIG_COMPAT_KERNEL_2_6_28
 
 ifdef CONFIG_WIRELESS_EXT
@@ -428,6 +449,7 @@ endif #CONFIG_WIRELESS_EXT
 export CONFIG_RTL8192CE=m
 export CONFIG_RTL8192SE=m
 export CONFIG_RTL8192DE=m
+export CONFIG_RTL8723AE=m
 
 export CONFIG_BRCMSMAC=m
 
@@ -512,6 +534,8 @@ export CONFIG_ATH9K_HTC=m
 
 export CONFIG_ATH6KL_USB=m
 
+export CONFIG_AR5523=m
+
 export CONFIG_BRCMFMAC_USB=y
 
 # RT2500USB does not require firmware
@@ -550,13 +574,17 @@ export CONFIG_BT_ATH3K=m
 
 export CONFIG_RTL8192CU=m
 
+export CONFIG_MWIFIEX_USB=m
+
 endif #CONFIG_USB end of USB driver list
 
 ifdef CONFIG_SPI_MASTER
 ifndef CONFIG_COMPAT_KERNEL_2_6_25
 
 ifdef CONFIG_CRC7
-export CONFIG_WL1251_SPI=m
+ifndef CONFIG_COMPAT_KERNEL_2_6_37
+export CONFIG_COMPAT_WL1251_SPI=m
+endif #CONFIG_COMPAT_KERNEL_2_6_37
 export CONFIG_WLCORE_SPI=m
 endif #CONFIG_CRC7
 export CONFIG_P54_SPI=m
@@ -579,8 +607,12 @@ export CONFIG_B43_SDIO=y
 
 ifdef CONFIG_CRC7
 ifdef CONFIG_WL12XX_PLATFORM_DATA
+ifndef CONFIG_COMPAT_KERNEL_2_6_37
 export CONFIG_COMPAT_WL1251_SDIO=m
+endif #CONFIG_COMPAT_KERNEL_2_6_37
+ifndef CONFIG_COMPAT_KERNEL_2_6_38
 export CONFIG_WLCORE_SDIO=m
+endif #CONFIG_COMPAT_KERNEL_2_6_38
 endif #CONFIG_WL12XX_PLATFORM_DATA
 endif #CONFIG_CRC7
 
@@ -590,10 +622,6 @@ ifndef CONFIG_COMPAT_KERNEL_2_6_32
 export CONFIG_COMPAT_LIBERTAS_SDIO=m
 NEED_LIBERTAS=y
 endif #CONFIG_COMPAT_KERNEL_2_6_32
-
-export CONFIG_IWM=m
-# export CONFIG_IWM_DEBUG=y
-# export CONFIG_IWM_TRACING=y
 
 export CONFIG_BT_HCIBTSDIO=m
 export CONFIG_BT_MRVL_SDIO=m
@@ -634,6 +662,7 @@ endif #CONFIG_MAC80211_LEDS
 
 # Atheros
 export CONFIG_ATH_COMMON=m
+export CONFIG_ATH_CARDS=m
 # export CONFIG_ATH_DEBUG=y
 
 export CONFIG_BRCMUTIL=m
@@ -643,15 +672,22 @@ ifndef CONFIG_COMPAT_KERNEL_2_6_29
 export CONFIG_BRCMFMAC=m
 endif #CONFIG_COMPAT_KERNEL_2_6_29
 
+ifndef CONFIG_COMPAT_KERNEL_2_6_30
+
 export CONFIG_WL_TI=y
 export CONFIG_WLCORE=m
 
 ifdef CONFIG_CRC7
 export CONFIG_WL1251=m
 export CONFIG_WL12XX=m
+export CONFIG_WL18XX=m
 endif #CONFIG_CRC7
 
-export CONFIG_MWIFIEX=m
+endif #CONFIG_COMPAT_KERNEL_2_6_30
+
+ifndef CONFIG_COMPAT_KERNEL_2_6_27
+export CONFIG_COMPAT_MWIFIEX=m
+endif #CONFIG_COMPAT_KERNEL_2_6_27
 
 ifndef CONFIG_CORDIC
 export CONFIG_COMPAT_CORDIC=y
@@ -682,3 +718,26 @@ endif #CONFIG_LEDS_TRIGGERS
 export CONFIG_RFKILL_BACKPORT_INPUT=y
 endif #CONFIG_COMPAT_KERNEL_2_6_31
 
+# compilation has been tested down to 3.0 but run time
+# tests have only started on 3.2.
+ifndef CONFIG_COMPAT_KERNEL_3_2
+# Basic DRM support
+export CONFIG_COMPAT_VIDEO_MODULES=y
+export CONFIG_COMPAT_DRM=m
+export CONFIG_COMPAT_DRM_TTM=m
+export CONFIG_COMPAT_DRM_KMS_HELPER=m
+export CONFIG_COMPAT_DRM_LOAD_EDID_FIRMWARE=y
+# Intel i915
+export CONFIG_COMPAT_DRM_I915=m
+# ATI/AMD Radeon
+export CONFIG_COMPAT_DRM_RADEON=m
+export CONFIG_COMPAT_DRM_RADEON_KMS=y
+endif #CONFIG_COMPAT_KERNEL_3_2
+
+# Enable nouveau on >= 3.3
+ifndef CONFIG_COMPAT_KERNEL_3_3
+export CONFIG_COMPAT_DRM_NOUVEAU=m
+export CONFIG_COMPAT_DRM_NOUVEAU_BACKLIGHT=y
+export CONFIG_COMPAT_NOUVEAU_DEBUG=5
+export CONFIG_COMPAT_NOUVEAU_DEBUG_DEFAULT=3
+endif #CONFIG_COMPAT_KERNEL_3_3

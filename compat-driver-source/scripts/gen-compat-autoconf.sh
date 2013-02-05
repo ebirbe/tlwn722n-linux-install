@@ -17,7 +17,7 @@ KERNEL_RELEASE=".compat_base_tree_version"
 MULT_DEP_FILE=".compat_pivot_dep"
 
 if [ $# -ne 2 ]; then
-	echo "Usage $0 <generic-compat-config-file> <compat-wireless-config-file>"
+	echo "Usage $0 <generic-compat-config-file> <compat-drivers-config-file>"
 	exit
 fi
 
@@ -57,29 +57,35 @@ function define_config {
 		echo "#define $VAR 1"
 		echo "#endif /* $VAR */ "
 		;;
-	*) # Assume string
-		# XXX: add better checks to make sure what was on
-		# the right was indeed a string
+	[0-9]*)
+		# Leave integers as is
+		echo "#ifndef $VAR"
+		echo "#define $VAR $VALUE"
+		echo "#endif /* $VAR */ "
+		;;
+	*)
+		# Escape every other thing with double quotes
 		echo "#ifndef $VAR"
 		echo "#define $VAR \"$VALUE\""
 		echo "#endif /* $VAR */ "
 		;;
+
 	esac
 }
 
-# This deals with core compat-wireless kernel requirements.
+# This deals with core compat-drivers kernel requirements.
 function define_config_req {
 	VAR=$1
 	echo "#ifndef $VAR"
-	echo -n "#error Compat-wireless requirement: $VAR must be enabled "
+	echo -n "#error Compat-drivers requirement: $VAR must be enabled "
 	echo "in your kernel"
 	echo "#endif /* $VAR */"
 }
 
 # This handles modules which have dependencies from the kernel
-# which compat-wireless isn't providing yet either because
+# which compat-drivers isn't providing yet either because
 # the dependency is not available as kernel module or
-# the module simply isn't provided by compat-wireless.
+# the module simply isn't provided by compat-drivers.
 function define_config_dep {
 	VAR=$1
 	VALUE=$2
@@ -135,8 +141,8 @@ cat <<EOF
 /*
  * Automatically generated C config: don't edit
  * $DATE 
- * compat-wireless-2.6: $CREL
- * linux-2.6: $KREL
+ * compat-drivers: $CREL
+ * linux: $KREL
  */
 #define COMPAT_RELEASE "$CREL"
 #define COMPAT_KERNEL_RELEASE "$KREL"

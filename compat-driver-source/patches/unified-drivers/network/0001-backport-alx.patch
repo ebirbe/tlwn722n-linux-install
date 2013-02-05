@@ -1,0 +1,125 @@
+This should go into patches/01-netdev.patch
+
+--- a/drivers/net/ethernet/atheros/alx/alx_main.c
++++ b/drivers/net/ethernet/atheros/alx/alx_main.c
+@@ -96,7 +96,11 @@ static void __alx_set_rx_mode(struct net
+ 
+ 	/* comoute mc addresses' hash value ,and put it into hash table */
+ 	netdev_for_each_mc_addr(ha, netdev)
++#if (LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,35))
+ 		alx_add_mc_addr(hw, ha->addr);
++#else
++		alx_add_mc_addr(hw, ha->dmi_addr);
++#endif
+ 
+ 	ALX_MEM_W32(hw, ALX_HASH_TBL0, hw->mc_hash[0]);
+ 	ALX_MEM_W32(hw, ALX_HASH_TBL1, hw->mc_hash[1]);
+@@ -128,8 +132,10 @@ static int alx_set_mac_address(struct ne
+ 	if (!is_valid_ether_addr(addr->sa_data))
+ 		return -EADDRNOTAVAIL;
+ 
++#if (LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,36))
+ 	if (netdev->addr_assign_type & NET_ADDR_RANDOM)
+ 		netdev->addr_assign_type ^= NET_ADDR_RANDOM;
++#endif
+ 
+ 	memcpy(netdev->dev_addr, addr->sa_data, netdev->addr_len);
+ 	memcpy(hw->mac_addr, addr->sa_data, netdev->addr_len);
+@@ -1137,6 +1143,7 @@ static void alx_set_vlan_mode(struct alx
+ }
+ 
+ 
++#if (LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,39))
+ static netdev_features_t alx_fix_features(struct net_device *netdev,
+ 					  netdev_features_t features)
+ {
+@@ -1169,6 +1176,7 @@ static int alx_set_features(struct net_d
+ 
+ 	return 0;
+ }
++#endif /* (LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,39)) */
+ 
+ /* alx_change_mtu - Change the Maximum Transfer Unit */
+ static int alx_change_mtu(struct net_device *netdev, int new_mtu)
+@@ -1193,7 +1201,17 @@ static int alx_change_mtu(struct net_dev
+ 		adpt->hw.mtu = new_mtu;
+ 		adpt->rxbuf_size = new_mtu > ALX_DEF_RXBUF_SIZE ?
+ 				   ALIGN(max_frame, 8) : ALX_DEF_RXBUF_SIZE;
++#if (LINUX_VERSION_CODE < KERNEL_VERSION(2,6,39))
++		if (new_mtu > (7*1024)) {
++			netdev->features &= ~NETIF_F_TSO;
++			netdev->features &= ~NETIF_F_TSO6;
++		} else {
++			netdev->features |= NETIF_F_TSO;
++			netdev->features |= NETIF_F_TSO6;
++		}
++#else
+ 		netdev_update_features(netdev);
++#endif /* (LINUX_VERSION_CODE < KERNEL_VERSION(2,6,39)) */
+ 		if (netif_running(netdev))
+ 			alx_reinit(adpt);
+ 	}
+@@ -2458,8 +2476,10 @@ static const struct net_device_ops alx_n
+ 	.ndo_change_mtu         = alx_change_mtu,
+ 	.ndo_do_ioctl           = alx_ioctl,
+ 	.ndo_tx_timeout         = alx_tx_timeout,
++#if (LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,39))
+ 	.ndo_fix_features	= alx_fix_features,
+ 	.ndo_set_features	= alx_set_features,
++#endif /* (LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,39)) */
+ #ifdef CONFIG_NET_POLL_CONTROLLER
+ 	.ndo_poll_controller    = alx_poll_controller,
+ #endif
+@@ -2561,7 +2581,7 @@ alx_probe(struct pci_dev *pdev, const st
+ 		goto err_iomap;
+ 	}
+ 
+-	netdev->netdev_ops = &alx_netdev_ops;
++	netdev_attach_ops(netdev, &alx_netdev_ops);
+ 	alx_set_ethtool_ops(netdev);
+ 	netdev->irq  = pdev->irq;
+ 	netdev->watchdog_timeo = ALX_WATCHDOG_TIME;
+@@ -2606,12 +2626,21 @@ alx_probe(struct pci_dev *pdev, const st
+ 		}
+ 	}
+ 
++#if (LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,39))
+ 	netdev->hw_features = NETIF_F_SG	 |
+ 			      NETIF_F_HW_CSUM	 |
+ 			      NETIF_F_HW_VLAN_RX |
+ 			      NETIF_F_TSO        |
+ 			      NETIF_F_TSO6;
+ 	netdev->features = netdev->hw_features | NETIF_F_HW_VLAN_TX;
++#else
++	netdev->features = NETIF_F_SG            |
++			   NETIF_F_HW_CSUM       |
++			   NETIF_F_HW_VLAN_RX    |
++			   NETIF_F_TSO           |
++			   NETIF_F_TSO6          |
++			   NETIF_F_HW_VLAN_TX;
++#endif /* (LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,39)) */
+ 
+ 	/* read permanent mac addr from register or eFuse */
+ 	if (alx_get_perm_macaddr(hw, hw->perm_addr)) {
+@@ -2787,6 +2816,8 @@ static struct pci_error_handlers alx_err
+ };
+ 
+ #ifdef CONFIG_PM_SLEEP
++compat_pci_suspend(alx_suspend);
++compat_pci_resume(alx_resume);
+ static SIMPLE_DEV_PM_OPS(alx_pm_ops, alx_suspend, alx_resume);
+ #define ALX_PM_OPS      (&alx_pm_ops)
+ #else
+@@ -2800,7 +2831,12 @@ static struct pci_driver alx_driver = {
+ 	.remove      = __devexit_p(alx_remove),
+ 	.shutdown    = alx_shutdown,
+ 	.err_handler = &alx_err_handler,
++#if (LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,29))
+ 	.driver.pm   = ALX_PM_OPS,
++#elif defined(CONFIG_PM_SLEEP)
++	.suspend        = alx_suspend_compat,
++	.resume         = alx_resume_compat,
++#endif
+ };
+ 
+ 

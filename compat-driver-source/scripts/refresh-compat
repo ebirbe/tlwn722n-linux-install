@@ -14,9 +14,9 @@
 # ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
 # OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 
-# The purpose of this script is to enable developers use compat-wireless
+# The purpose of this script is to enable developers use compat-drivers
 # backport work without having to carry code on their tree. This lets
-# developers synch to newer compat-wireless releases to gain more backport
+# developers synch to newer compat-drivers releases to gain more backport
 # work. If you use this throw the files into your .gitignore:
 #
 # compat/
@@ -47,7 +47,7 @@ PURPLE="\033[35m"
 CYAN="\033[36m"
 UNDERLINE="\033[02m"
 
-COMPAT_SRC="$HOME/devel/compat-wireless/"
+COMPAT_SRC="$HOME/devel/compat-drivers/"
 EXTRA_COPY=""
 
 if [[ -f .compat_copy ]]; then
@@ -65,6 +65,7 @@ COPY="$COPY scripts/gen-compat-autoconf.sh"
 COPY="$COPY scripts/modlib.sh"
 COPY="$COPY scripts/update-initramfs"
 COPY="$COPY scripts/skip-colors"
+COPY="$COPY .compat_base"
 COPY="$COPY .compat_base_tree"
 COPY="$COPY .compat_base_tree_version"
 COPY="$COPY .compat_version"
@@ -73,6 +74,12 @@ COPY="$COPY $EXTRA_COPY"
 
 REFRESH_LOCAL="scripts/refresh-compat-local"
 REFRESH_TARGET="refresh-compat"
+
+WORK_DIR="$(pwd)"
+cd ${COMPAT_SRC}
+# Only copy the base files
+./scripts/admin-update.sh -b
+cd ${WORK_DIR}
 
 for i in $COPY ; do
 	if [[ -d ${COMPAT_SRC}${i} ]]; then
@@ -83,7 +90,7 @@ for i in $COPY ; do
 	if [[ -f ${COMPAT_SRC}${i} ]]; then
 		DIR=$(dirname $i)
 		if [[ ! -d $DIR ]]; then
-			mkdir $DIR
+			mkdir -p $DIR
 		fi
 
 		if [[ -x ${COMPAT_SRC}${i} ]]; then
